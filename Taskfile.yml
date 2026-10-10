@@ -1,0 +1,147 @@
+version: '3'
+
+vars:
+  BIN_DIR: bin
+  BINARY: bin/mva
+
+tasks:
+  default:
+    desc: Run full check suite (fmt, vet, test, lint, gosec)
+    cmds:
+      - task: check
+
+  build:
+    desc: Build mva binary
+    cmds:
+      - mkdir -p {{.BIN_DIR}}
+      - go build -o {{.BINARY}} ./cmd/mva/
+    generates:
+      - '{{.BINARY}}'
+
+  run:
+    desc: Build and start HTTP mirror
+    deps: [build]
+    cmds:
+      - '{{.BINARY}} serve {{.CLI_ARGS}}'
+
+  serve:
+    desc: Alias for run
+    cmds:
+      - task: run
+
+  fmt:
+    desc: Format Go sources with gofmt
+    cmds:
+      - gofmt -w .
+
+  fmt:check:
+    desc: Fail if any file needs gofmt
+    cmds:
+      - test -z "$(gofmt -l .)"
+
+  vet:
+    desc: Run go vet
+    cmds:
+      - go vet ./...
+
+  test:
+    desc: Run all tests
+    cmds:
+      - go test ./... -count=1
+
+  test:race:
+    desc: Run tests with -race
+    cmds:
+      - go test -race -timeout 2m ./... -count=1
+
+  test:short:
+    desc: Run tests skipping live Mojang network cases
+    cmds:
+      - go test -short ./... -count=1
+
+  bench:
+    desc: Run internal package benchmarks
+    cmds:
+      - go test -bench=. -benchmem ./internal/... -run=^$ -benchtime=100ms
+
+  tools:
+    desc: Install gosec, staticcheck, and govulncheck
+    cmds:
+      - go install github.com/securego/gosec/v2/cmd/gosec@latest
+      - go install honnef.co/go/tools/cmd/staticcheck@latest
+      - go install golang.org/x/vuln/cmd/govulncheck@latest
+
+  lint:
+    desc: Run staticcheck
+    preconditions:
+      - sh: command -v staticcheck
+        msg: "staticcheck not found; run: task tools"
+    cmds:
+      - staticcheck ./...
+
+  sec:
+    desc: Run gosec security scanner
+    aliases: [gosec]
+    preconditions:
+      - sh: command -v gosec
+        msg: "gosec not found; run: task tools"
+    cmds:
+      - gosec ./...
+
+  vuln:
+    desc: Run govulncheck
+    preconditions:
+      - sh: command -v govulncheck
+        msg: "govulncheck not found; run: task tools"
+    cmds:
+      - govulncheck ./...
+
+  check:
+    desc: CI-style checks (fmt, vet, test, lint, gosec, govulncheck)
+    cmds:
+      - task: fmt:check
+      - task: vet
+      - task: test
+      - task: lint
+      - task: sec
+      - task: vuln
+
+  ci:
+    desc: Alias for check
+    cmds:
+      - task: check
+
+  clean:
+    desc: Remove build output
+    cmds:
+      - rm -rf {{.BIN_DIR}}
+
+  archive:
+    desc: Archive Minecraft versions (pass args after --)
+    deps: [build]
+    cmds:
+      - '{{.BINARY}} archive {{.CLI_ARGS}}'
+
+  archive-fabric:
+    desc: Archive Fabric metadata and libraries
+    deps: [build]
+    cmds:
+      - '{{.BINARY}} archive-fabric {{.CLI_ARGS}}'
+
+  archive-java:
+    desc: Archive Eclipse Temurin JDKs
+    deps: [build]
+    cmds:
+      - '{{.BINARY}} archive-java {{.CLI_ARGS}}'
+
+  export:
+    desc: Export data_dir to zip
+    deps: [build]
+    cmds:
+      - '{{.BINARY}} export {{.CLI_ARGS}}'
+
+  import:
+    desc: Import data_dir from zip
+    deps: [build]
+    cmds:
+      - '{{.BINARY}} import {{.CLI_ARGS}}'

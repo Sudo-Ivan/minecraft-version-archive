@@ -1,0 +1,41 @@
+[general]
+data_dir = ./data
+listen = :8080
+public_url = http://localhost:8080
+
+[archive]
+; archive_all = true
+; include_snapshots = false
+; include_prereleases = false
+; include_rc = false
+; include_alpha = false
+; include_beta = false
+; versions_file = versions.txt
+; versions = 1.20.1,1.19.4
+client_only = false
+server_only = false
+workers = 8
+retry_max = 5
+retry_base_ms = 500
+; agent_id = my-agent-1
+; coordinator_stale_sec = 3600
+
+[cache]
+enabled = true
+max_entries = 512
+max_mb = 512
+shards = 256
+
+[server]
+inventory_ttl_sec = 30
+; trust_proxy = true
+; proxy_on_miss = false
+; proxy_cache = true
+
+[stats]
+enabled = false
+
+[p2p]
+enabled = false
+peers = http://peer1:8080,http://peer2:8080
+timeout_sec = 30
