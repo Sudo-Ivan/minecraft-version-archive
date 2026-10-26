@@ -1,0 +1,354 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>API reference · minecraft-version-archive</title>
+<meta name="description" content="HTTP API reference for a minecraft-version-archive mirror: routes, response shapes, hash rules and launcher integration.">
+<link rel="preload" href="/web/fonts/bungee-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/web/fonts/chivo-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/web/site.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23a9c8e8' stroke-width='1.4'%3E%3Cpath d='M12 2l9 5v10l-9 5-9-5V7z'/%3E%3Cpath d='M3 7l9 5 9-5'/%3E%3Cpath d='M12 12v10'/%3E%3C/svg%3E">
+<script>document.documentElement.classList.add('js');</script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<nav class="nav">
+  <div class="nav__bar">
+    <a class="nav__home" href="/" aria-label="minecraft-version-archive home"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M12 2l9 5v10l-9 5-9-5V7z"/><path d="M3 7l9 5 9-5"/><path d="M12 12v10"/></svg>mva</a>
+    <div class="nav__links">
+      <a href="/docs" aria-current="page">API docs</a>
+      <a href="/mc/game/version_manifest_v2.json">Manifest</a>
+      <a href="/health">Health</a>
+    </div>
+  </div>
+</nav>
+
+<header class="doc-hero">
+  <div class="container">
+    <div class="doc-hero__grid">
+      <div>
+        <h1>API reference</h1>
+        <p class="lead">Every route this mirror serves, with request shapes and hash rules.</p>
+      </div>
+      <figure class="fig crt">
+        <pre>GET /
+
+Accept: text/html          this site
+Accept: application/json   the endpoint index
+?json                      forces the index
+
+{
+  "name": "minecraft-version-archive",
+  "public_url": "http://localhost:8080",
+  "endpoints": {
+    "manifest":  "/mc/game/version_manifest_v2.json",
+    "versions":  "/versions/{file}",
+    "jars":      "/jars/{kind}/{file}",
+    "libraries": "/libraries/{path}",
+    "java":      "/java/{id}",
+    "fabric_meta": "/fabric/v2/{path}",
+    "docs":      "/docs",
+    "health":    "/health"
+  }
+}</pre>
+        <figcaption>Confirm public_url at runtime.</figcaption>
+      </figure>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+  <div class="container">
+    <div class="doc-grid">
+      <nav class="doc-rail" aria-label="Contents">
+        <div class="doc-rail__title">SHEET INDEX</div>
+        <ol>
+          <li><a href="#protocol">Protocol rules</a></li>
+          <li><a href="#vanilla">Vanilla flow</a></li>
+          <li><a href="#rewrites">Rewritten fields</a></li>
+          <li><a href="#java">Java runtime</a></li>
+          <li><a href="#temurin">Temurin</a></li>
+          <li><a href="#fabric">Fabric</a></li>
+          <li><a href="#polymc">PolyMC meta</a></li>
+          <li><a href="#integrity">Integrity</a></li>
+          <li><a href="#behaviors">Behaviors</a></li>
+          <li><a href="#operations">Operations</a></li>
+          <li><a href="#cheatsheet">Upstream map</a></li>
+          <li><a href="#checklist">Checklist</a></li>
+        </ol>
+      </nav>
+
+      <div class="doc-body">
+
+        <section id="protocol" aria-labelledby="h-protocol">
+          <h2 id="h-protocol">Protocol rules</h2>
+          <div class="spec-wrap">
+            <table class="spec">
+              <thead><tr><th scope="col">Rule</th><th scope="col">Detail</th></tr></thead>
+              <tbody>
+                <tr><th scope="row">Methods</th><td>GET and HEAD only. Other methods drop the connection.</td></tr>
+                <tr><th scope="row">Range</th><td><code>Range: bytes=start-end</code> returns a 206 partial body.</td></tr>
+                <tr><th scope="row">Paths</th><td>Unknown or traversal paths return 404; scanner probes drop.</td></tr>
+                <tr><th scope="row">Content</th><td>JSON for metadata, binary for files.</td></tr>
+                <tr><th scope="row">Compression</th><td>JSON honours <code>Accept-Encoding: gzip</code>.</td></tr>
+                <tr><th scope="row">Manifest scope</th><td>The manifest lists only versions held on this mirror.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="vanilla" aria-labelledby="h-vanilla">
+          <h2 id="h-vanilla">Vanilla flow</h2>
+          <p>The standard Mojang sequence, with every host swapped for this mirror:</p>
+          <figure class="fig crt">
+            <pre>1. GET {BASE}/mc/game/version_manifest_v2.json
+2. Pick a version id from manifest.versions[]
+3. GET {BASE}/versions/{id}.json
+4. From the version JSON, fetch each downloads.*.url:
+     client jar      /jars/client/{id}.jar
+     server jar      /jars/server/{id}.jar
+     libraries[]     /libraries/{maven/path}
+     assetIndex      /assets/indexes/{assetIndex.id}.json
+5. For each object in the asset index:
+   GET {BASE}/assets/objects/{first2}/{sha1}</pre>
+            <figcaption>Version id aliases apply: 1.5.0 resolves to 1.5 on /versions/, /java/ and jar paths.</figcaption>
+          </figure>
+        </section>
+
+        <section id="rewrites" aria-labelledby="h-rewrites">
+          <h2 id="h-rewrites">Rewritten fields</h2>
+          <p>Mojang’s version JSON is served with URLs pointing at this host. Original <code>sha1</code> and <code>size</code> fields are preserved; verify downloads against them.</p>
+          <div class="spec-wrap">
+            <table class="spec">
+              <thead><tr><th scope="col">Field</th><th scope="col">Rewritten to</th></tr></thead>
+              <tbody>
+                <tr><td class="mono">downloads.client.url</td><td class="mono">{BASE}/jars/client/{id}.jar</td></tr>
+                <tr><td class="mono">downloads.server.url</td><td class="mono">{BASE}/jars/server/{id}.jar</td></tr>
+                <tr><td class="mono">libraries[].downloads.*.url</td><td class="mono">{BASE}/libraries/{maven/path}</td></tr>
+                <tr><td class="mono">assetIndex.url</td><td class="mono">{BASE}/assets/indexes/{assetIndex.id}.json</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="java" aria-labelledby="h-java">
+          <h2 id="h-java">Java runtime</h2>
+          <p>Two layers: which Java Mojang expects for a version, and where to fetch Eclipse Temurin for it.</p>
+          <h3>Requirement for one version</h3>
+          <figure class="fig crt">
+            <pre>GET /java/{mcVersion}
+
+{
+  "id": "1.21.1",
+  "major_version": 21,
+  "component": "java-runtime-delta",
+  "temurin": "/java/temurin/21"
+}</pre>
+            <figcaption>temurin is present only when that major is archived on this mirror.</figcaption>
+          </figure>
+          <div class="spec-wrap">
+            <table class="spec">
+              <thead><tr><th scope="col">Field</th><th scope="col">Meaning</th></tr></thead>
+              <tbody>
+                <tr><td class="mono">major_version</td><td>Required Java major: 8, 17, 21, and so on</td></tr>
+                <tr><td class="mono">component</td><td>Mojang runtime component name</td></tr>
+                <tr><td class="mono">temurin</td><td>Temurin manifest path, when archived</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <h3>Bulk index</h3>
+          <figure class="fig crt">
+            <pre>GET /java
+
+{ "versions": [
+    { "id": "1.21.1", "major_version": 21, "temurin": "/java/temurin/21" },
+    { "id": "1.20.1", "major_version": 17 } ] }</pre>
+          </figure>
+        </section>
+
+        <section id="temurin" aria-labelledby="h-temurin">
+          <h2 id="h-temurin">Temurin</h2>
+          <p>Optional; requires the operator to run <code>mva archive-java</code>. Not every platform and major pair exists upstream.</p>
+          <h3>List archived majors</h3>
+          <figure class="fig crt"><pre>GET /java/temurin
+
+{ "majors": [8, 17, 21] }</pre></figure>
+          <h3>Manifest for one major</h3>
+          <figure class="fig crt">
+            <pre>GET /java/temurin/{major}
+
+{ "vendor": "Eclipse Temurin", "major": 21,
+  "release_name": "jdk-21.0.11+10",
+  "platforms": [
+    { "runtimeOS": "linux-x64",
+      "url": "{BASE}/java/temurin/21/linux-x64/OpenJDK21U-….tar.gz",
+      "size": 207513939,
+      "checksum": { "type": "sha-256", "hash": "…" } } ] }</pre>
+          </figure>
+          <h3>Platforms</h3>
+          <div class="spec-wrap">
+            <table class="spec">
+              <thead><tr><th scope="col">{platform}</th><th scope="col">OS and arch</th><th scope="col">runtimeOS (Prism-style)</th></tr></thead>
+              <tbody>
+                <tr><td class="mono">linux-x64</td><td>Linux x86_64</td><td class="mono">linux-x64</td></tr>
+                <tr><td class="mono">linux-aarch64</td><td>Linux ARM64</td><td class="mono">linux-arm64</td></tr>
+                <tr><td class="mono">windows-x64</td><td>Windows x86_64</td><td class="mono">windows-x64</td></tr>
+                <tr><td class="mono">mac-x64</td><td>macOS Intel</td><td class="mono">osx-x64</td></tr>
+                <tr><td class="mono">mac-aarch64</td><td>macOS Apple Silicon</td><td class="mono">osx-arm64</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <h3>Suggested launcher logic</h3>
+          <figure class="fig crt">
+            <pre>1. GET /java/{mcVersion}          gives major_version, optional temurin path
+2. GET /java/temurin/{major}    gives platforms[], pick by runtimeOS
+3. GET entry.url                downloads the archive
+4. Verify SHA-256 and size      then extract to the runtime dir
+5. No temurin field             falls back to user Java or Adoptium</pre>
+          </figure>
+        </section>
+
+        <section id="fabric" aria-labelledby="h-fabric">
+          <h2 id="h-fabric">Fabric</h2>
+          <p>Swap the meta and maven host prefixes; the JSON shapes are unchanged.</p>
+          <figure class="fig crt">
+            <pre>GET /fabric/v2/versions/loader
+GET /fabric/v2/versions/loader/{gameVersion}
+GET /fabric/v2/versions/loader/{gameVersion}/{loaderVersion}
+
+GET /maven/fabricmc/net/fabricmc/fabric-loader/0.16.9/fabric-loader-0.16.9.jar</pre>
+            <figcaption>Library URLs inside Fabric meta JSON are rewritten to {BASE}/maven/fabricmc/… when served.</figcaption>
+          </figure>
+        </section>
+
+        <section id="polymc" aria-labelledby="h-polymc">
+          <h2 id="h-polymc">PolyMC meta</h2>
+          <p>Replace <code>meta.polymc.org/v1/</code> or <code>meta.prismlauncher.org/v1/</code> with <code>{BASE}/meta/v1/</code>:</p>
+          <figure class="fig crt">
+            <pre>GET /meta/v1/index.json
+GET /meta/v1/net.minecraft/index.json
+GET /meta/v1/net.minecraft/{mcVersion}.json
+GET /meta/v1/org.lwjgl3/index.json          and /{version}.json
+GET /meta/v1/org.lwjgl/index.json           and /{version}.json
+GET /meta/v1/net.minecraft.java/index.json  and /java{major}.json
+GET /meta/v1/net.fabricmc.fabric-loader/index.json?minecraft={mcVersion}
+GET /meta/v1/net.fabricmc.fabric-loader/{loaderVersion}.json?minecraft={mcVersion}
+GET /meta/v1/net.fabricmc.intermediary/index.json  and /{mcVersion}.json</pre>
+            <figcaption>?minecraft={mcVersion} scopes loader lists to one game version.</figcaption>
+          </figure>
+          <div class="spec-wrap">
+            <table class="spec">
+              <thead><tr><th scope="col">Component</th><th scope="col">Source</th></tr></thead>
+              <tbody>
+                <tr><td class="mono">net.minecraft</td><td>Converted from archived Mojang version JSONs; mainJar, assetIndex, libraries, compatibleJavaMajors and traits derived per version.</td></tr>
+                <tr><td class="mono">org.lwjgl3, org.lwjgl</td><td>Generated from LWJGL entries in archived version JSONs; natives flatten into artifact-natives-{os} names.</td></tr>
+                <tr><td class="mono">net.minecraft.java</td><td>Generated from archived Temurin manifests with sha256 checksums and Prism-style runtimeOS values.</td></tr>
+                <tr><td class="mono">net.fabricmc.*</td><td>Generated from archived Fabric meta.</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p>Components with no archived data are omitted from the index and return 404, or proxy to upstream meta when proxy_on_miss is on.</p>
+        </section>
+
+        <section id="integrity" aria-labelledby="h-integrity">
+          <h2 id="h-integrity">Integrity</h2>
+          <div class="spec-wrap">
+            <table class="spec">
+              <thead><tr><th scope="col">Asset type</th><th scope="col">Verification</th></tr></thead>
+              <tbody>
+                <tr><td>Jars, libraries</td><td>Mojang sha1 and size from the version JSON</td></tr>
+                <tr><td>Asset objects</td><td>SHA-1 carried in the URL path</td></tr>
+                <tr><td>Temurin archives</td><td>SHA-256 and size in the /java/temurin/{major} manifest</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p>Clients should always verify. The mirror also verifies on serve for assets and Temurin; a corrupt object returns 404, or an upstream fetch when proxy_on_miss is on.</p>
+        </section>
+
+        <section id="behaviors" aria-labelledby="h-behaviors">
+          <h2 id="h-behaviors">Behaviors</h2>
+          <div class="spec-wrap">
+            <table class="spec">
+              <thead><tr><th scope="col">Setting</th><th scope="col">Client impact</th></tr></thead>
+              <tbody>
+                <tr><td class="mono">proxy_on_miss</td><td>A 404 may become a one-time upstream fetch; the file can appear later if cached.</td></tr>
+                <tr><td class="mono">trust_proxy</td><td>JSON URLs use X-Forwarded-Proto and X-Forwarded-Host when present.</td></tr>
+                <tr><td class="mono">stats.enabled</td><td>Exposes GET /stats.</td></tr>
+                <tr><td class="mono">block_scanners</td><td>Non-GET/HEAD requests outside /p2p/ drop the connection.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="operations" aria-labelledby="h-operations">
+          <h2 id="h-operations">Operations</h2>
+          <div class="spec-wrap">
+            <table class="spec">
+              <thead><tr><th scope="col">Route</th><th scope="col">Returns</th></tr></thead>
+              <tbody>
+                <tr><td class="mono">GET /health</td><td class="mono">{ "status": "ok" }</td></tr>
+                <tr><td class="mono">GET /stats</td><td>Uptime, requests, bytes, cache hit rate, versions stored. Requires stats.enabled.</td></tr>
+                <tr><td class="mono">GET /p2p/inventory</td><td>Versions, libraries and assets held, for peer federation. Not for launchers.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="cheatsheet" aria-labelledby="h-cheatsheet">
+          <h2 id="h-cheatsheet">Upstream map</h2>
+          <div class="spec-wrap">
+            <table class="spec">
+              <thead><tr><th scope="col">Upstream</th><th scope="col">Mirror path</th></tr></thead>
+              <tbody>
+                <tr><td class="mono">piston-meta.mojang.com</td><td class="mono">/mc/game/version_manifest_v2.json</td></tr>
+                <tr><td class="mono">piston-meta packages</td><td class="mono">/versions/{id}.json</td></tr>
+                <tr><td class="mono">piston-data.mojang.com</td><td class="mono">/jars/client/{id}.jar</td></tr>
+                <tr><td class="mono">libraries.minecraft.net</td><td class="mono">/libraries/{path}</td></tr>
+                <tr><td class="mono">resources.download.minecraft.net</td><td class="mono">/assets/objects/{aa}/{hash}</td></tr>
+                <tr><td class="mono">meta.fabricmc.net /v2</td><td class="mono">/fabric/v2/{path}</td></tr>
+                <tr><td class="mono">maven.fabricmc.net</td><td class="mono">/maven/fabricmc/{path}</td></tr>
+                <tr><td class="mono">meta.polymc.org /v1</td><td class="mono">/meta/v1/{path}</td></tr>
+                <tr><td class="mono">Adoptium Temurin</td><td class="mono">/java/temurin/…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="checklist" aria-labelledby="h-checklist">
+          <h2 id="h-checklist">Checklist</h2>
+          <ol class="list doc-check">
+            <li>Set {BASE}; confirm public_url at GET /.</li>
+            <li>Use returned URLs as-is; they are rewritten.</li>
+            <li>Verify SHA-1 on game files, SHA-256 on Temurin.</li>
+            <li>Support Range for large jars and resume.</li>
+            <li>404 means not archived on this mirror.</li>
+            <li>Use /java/{v} and /java/temurin/{major} for auto-Java.</li>
+            <li>For Fabric, swap the meta and maven hosts only.</li>
+            <li>Apply aliases (1.5.0 to 1.5) on user input.</li>
+            <li>GET and HEAD only.</li>
+          </ol>
+        </section>
+
+      </div>
+    </div>
+  </div>
+</main>
+
+<footer class="footer">
+  <div class="container">
+    <div class="footer__mark"><svg width="30" height="30" viewBox="0 0 52 52" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M26 4l20 11v22L26 48 6 37V15z"/><path d="M6 15l20 11 20-11"/><path d="M26 26v22"/></svg>mva</div>
+    <nav class="footer__links" aria-label="Footer">
+      <a href="/">Home</a>
+      <a href="/?json">Endpoint index (JSON)</a>
+      <a href="/mc/game/version_manifest_v2.json">Manifest</a>
+      <a href="/health">Health</a>
+    </nav>
+    <p class="footer__colophon">Fonts vendored, no CDN. Apache-2.0. Unofficial mirror; Minecraft is a Mojang Synergies AB trademark.</p>
+  </div>
+</footer>
+
+<script src="/web/site.js" defer></script>
+</body>
+</html>

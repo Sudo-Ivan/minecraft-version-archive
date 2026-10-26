@@ -51,6 +51,8 @@ const (
 	FileHashIndex   = "sha1_index.json"
 
 	RouteRoot           = "GET /{$}"
+	RouteDocs           = "GET /docs"
+	RouteWebAssets      = "GET /web/{file...}"
 	RouteHealth         = "GET /health"
 	RouteStats          = "GET /stats"
 	RouteInventory      = "GET /p2p/inventory"
@@ -77,6 +79,7 @@ const (
 	HeaderETag            = "ETag"
 	HeaderIfNoneMatch     = "If-None-Match"
 	HeaderRange           = "Range"
+	HeaderAccept          = "Accept"
 	HeaderAcceptEncoding  = "Accept-Encoding"
 	HeaderContentEncoding = "Content-Encoding"
 	HeaderVary            = "Vary"
@@ -87,7 +90,11 @@ const (
 	CacheControlShort     = "public, max-age=60"
 	CacheControlNoStore   = "no-store"
 
-	MIMEJSON = "application/json"
+	MIMEJSON  = "application/json"
+	MIMEHTML  = "text/html; charset=utf-8"
+	MIMECSS   = "text/css; charset=utf-8"
+	MIMECSSJS = "text/javascript; charset=utf-8"
+	MIMEWOFF2 = "font/woff2"
 
 	ReadHeaderTimeout   = 10 * time.Second
 	IdleTimeout         = 120 * time.Second
@@ -130,4 +137,5 @@ var (
 	HealthBody      = []byte(`{"status":"ok"}`)
 	AcceptRanges    = []string{"bytes"}
 	ContentTypeJSON = []string{MIMEJSON}
+	ContentTypeHTML = []string{MIMEHTML}
 )

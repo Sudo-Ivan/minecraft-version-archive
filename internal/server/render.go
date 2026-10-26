@@ -142,7 +142,7 @@ func isSHA1Hex(s string) bool {
 // precomputed gzip body from a render/meta cache, or nil to compress lazily.
 func (s *Server) emitTagged(w http.ResponseWriter, r *http.Request, data, gz []byte, cacheHit bool, cc, etag string) int64 {
 	h := w.Header()
-	h[constants.HeaderVary] = []string{constants.HeaderAcceptEncoding}
+	h[constants.HeaderVary] = append(h[constants.HeaderVary], constants.HeaderAcceptEncoding)
 	if cc != "" {
 		h[constants.HeaderCacheControl] = []string{cc}
 	}

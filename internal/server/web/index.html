@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>minecraft-version-archive</title>
+<meta name="description" content="Self-hosted HTTP mirror of Minecraft Java Edition files: manifests, jars, libraries and assets on one origin.">
+<link rel="preload" href="/web/fonts/bungee-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/web/fonts/chivo-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/web/site.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23a9c8e8' stroke-width='1.4'%3E%3Cpath d='M12 2l9 5v10l-9 5-9-5V7z'/%3E%3Cpath d='M3 7l9 5 9-5'/%3E%3Cpath d='M12 12v10'/%3E%3C/svg%3E">
+<script>document.documentElement.classList.add('js');</script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<nav class="nav">
+  <div class="nav__bar">
+    <a class="nav__home" href="/" aria-label="minecraft-version-archive home"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M12 2l9 5v10l-9 5-9-5V7z"/><path d="M3 7l9 5 9-5"/><path d="M12 12v10"/></svg>mva</a>
+    <div class="nav__links">
+      <a href="/docs">API docs</a>
+      <a href="/mc/game/version_manifest_v2.json">Manifest</a>
+      <a href="/health">Health</a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="container">
+    <div class="hero__grid">
+      <div class="hero__text">
+        <h1>Minecraft version archive</h1>
+        <p class="lead">Self-hosted mirror of Minecraft Java files. GET and HEAD only.</p>
+        <div class="hero__actions">
+          <div class="copyfield">
+            <code data-manifest-url>/mc/game/version_manifest_v2.json</code>
+            <button class="btn" type="button" data-copy>Copy</button>
+          </div>
+          <a class="btn btn--quiet" href="/docs">API docs</a>
+        </div>
+
+      </div>
+
+      <figure class="sheet crt">
+        <figcaption class="sheet__title"><span>ROUTE REGISTER</span><span>GET / HEAD</span></figcaption>
+        <table class="register">
+          <thead><tr><th scope="col">Route</th><th scope="col">Serves</th></tr></thead>
+          <tbody>
+            <tr><th scope="rowgroup" colspan="2">Discovery</th></tr>
+            <tr><td class="mono">/</td><td>Index</td></tr>
+            <tr><td class="mono">/health</td><td>Liveness</td></tr>
+            <tr><th scope="rowgroup" colspan="2">Vanilla</th></tr>
+            <tr class="cursor"><td class="mono">/mc/game/version_manifest_v2.json</td><td>Manifest</td></tr>
+            <tr><td class="mono">/versions/{id}.json</td><td>Version JSON</td></tr>
+            <tr><td class="mono">/jars/{kind}/{id}.jar</td><td>Jars</td></tr>
+            <tr><td class="mono">/libraries/{path}</td><td>Libraries</td></tr>
+            <tr><td class="mono">/assets/indexes/{id}.json</td><td>Asset index</td></tr>
+            <tr><td class="mono">/assets/objects/{aa}/{hash}</td><td>Objects</td></tr>
+            <tr><th scope="rowgroup" colspan="2">Java</th></tr>
+            <tr><td class="mono">/java, /java/{id}</td><td>Runtime</td></tr>
+            <tr><td class="mono">/java/temurin/{major}/…</td><td>JDKs</td></tr>
+            <tr><th scope="rowgroup" colspan="2">Modded</th></tr>
+            <tr><td class="mono">/fabric/v2/{path}</td><td>Fabric meta</td></tr>
+            <tr><td class="mono">/maven/fabricmc/{path}</td><td>Maven</td></tr>
+            <tr><td class="mono">/meta/v1/{path}</td><td>Prism meta</td></tr>
+            <tr><th scope="rowgroup" colspan="2">Operations</th></tr>
+            <tr><td class="mono">/p2p/inventory</td><td>Inventory</td></tr>
+            <tr><td class="mono">/stats</td><td>Metrics</td></tr>
+          </tbody>
+        </table>
+        <div class="sheet__detail">
+          <svg width="52" height="52" viewBox="0 0 52 52" fill="none" stroke="currentColor" stroke-width="1" aria-hidden="true"><path d="M14 6l12 7v14l-12 7-12-7V13z"/><path d="M2 13l12 7 12-7"/><path d="M14 20v14"/><path d="M38 20l10 5.8V37L38 43l-10-6v-11z"/><path d="M28 26l10 5.8L48 26"/><path d="M38 31.8V43"/></svg>
+          <span class="lbl">versions held</span>
+          <span class="count" data-version-count>…</span>
+        </div>
+      </figure>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+
+<section aria-labelledby="map">
+  <div class="container">
+    <h2 class="section-head" id="map">Upstream map</h2>
+    
+    <div class="spec-wrap">
+      <table class="spec">
+        <thead><tr><th scope="col">Upstream</th><th scope="col">Mirror path</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">piston-meta.mojang.com/mc/game/…</td><td class="mono">/mc/game/version_manifest_v2.json</td></tr>
+          <tr><td class="mono">piston-meta.mojang.com/v1/packages/…</td><td class="mono">/versions/{id}.json</td></tr>
+          <tr><td class="mono">piston-data.mojang.com/…</td><td class="mono">/jars/{kind}/{id}.jar</td></tr>
+          <tr><td class="mono">libraries.minecraft.net/{path}</td><td class="mono">/libraries/{path}</td></tr>
+          <tr><td class="mono">resources.download.minecraft.net/{aa}/{hash}</td><td class="mono">/assets/objects/{aa}/{hash}</td></tr>
+          <tr><td class="mono">meta.fabricmc.net/v2/{path}</td><td class="mono">/fabric/v2/{path}</td></tr>
+          <tr><td class="mono">maven.fabricmc.net/{path}</td><td class="mono">/maven/fabricmc/{path}</td></tr>
+          <tr><td class="mono">meta.polymc.org or meta.prismlauncher.org /v1/{path}</td><td class="mono">/meta/v1/{path}</td></tr>
+          <tr><td class="mono">api.adoptium.net Temurin</td><td class="mono">/java/temurin/{major}/…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section aria-labelledby="integrity">
+  <div class="container">
+    <h2 class="section-head" id="integrity">Integrity</h2>
+    <div class="rows">
+      <div>
+        <h3>SHA-1 in the manifest</h3>
+        <p>Jars and libraries verify against Mojang’s sha1.</p>
+      </div>
+      <div>
+        <h3>SHA-1 in the path</h3>
+        <p>Asset objects carry their hash in the URL, re-checked on serve.</p>
+      </div>
+      <div>
+        <h3>SHA-256 for Temurin</h3>
+        <p>Java archives verify against each major’s checksum.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="close" aria-labelledby="start">
+  <div class="container">
+    <div class="close__grid">
+      <div>
+        <h2 id="start">Host your own</h2>
+        
+        <div class="close__actions">
+          <div class="copyfield">
+            <code data-manifest-url>/mc/game/version_manifest_v2.json</code>
+            <button class="btn" type="button" data-copy>Copy</button>
+          </div>
+          <a class="btn btn--quiet" href="/docs">API docs</a>
+        </div>
+      </div>
+      <figure class="fig crt">
+        <pre>go build -o bin/mva ./cmd/mva/
+
+./bin/mva archive --all        # every release
+./bin/mva archive-fabric       # fabric meta and maven
+./bin/mva serve                # this site and the mirror
+
+# then point the launcher at:
+/mc/game/version_manifest_v2.json</pre>
+        <figcaption>Serves on :8080 by default.</figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="footer">
+  <div class="container">
+    <div class="footer__mark"><svg width="30" height="30" viewBox="0 0 52 52" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M26 4l20 11v22L26 48 6 37V15z"/><path d="M6 15l20 11 20-11"/><path d="M26 26v22"/></svg>mva</div>
+    <nav class="footer__links" aria-label="Footer">
+      <a href="/docs">API docs</a>
+      <a href="/?json">Endpoint index (JSON)</a>
+      <a href="/mc/game/version_manifest_v2.json">Manifest</a>
+      <a href="/health">Health</a>
+    </nav>
+    <p class="footer__colophon">Fonts vendored, no CDN. Apache-2.0. Unofficial mirror; Minecraft is a Mojang Synergies AB trademark.</p>
+  </div>
+</footer>
+
+<script src="/web/site.js" defer></script>
+</body>
+</html>

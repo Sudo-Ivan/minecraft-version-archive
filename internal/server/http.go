@@ -118,6 +118,8 @@ func New(cfg *config.Config, archiver *archive.Archiver, log *slog.Logger) *Serv
 
 func (s *Server) routes() {
 	s.mux.HandleFunc(constants.RouteRoot, s.handleRoot)
+	s.mux.HandleFunc(constants.RouteDocs, s.handleDocs)
+	s.mux.HandleFunc(constants.RouteWebAssets, s.handleWebAsset)
 	s.mux.HandleFunc(constants.RouteHealth, s.handleHealth)
 	if s.cfg.StatsEnabled {
 		s.mux.HandleFunc(constants.RouteStats, s.handleStats)
@@ -156,11 +158,21 @@ func (s *Server) ListenAndServe() error {
 }
 
 func (s *Server) handleRoot(w http.ResponseWriter, r *http.Request) {
+	// The root negotiates: browsers (Accept: text/html) get the embedded
+	// site, everything else gets the endpoint index. ?json forces the
+	// JSON view so the index stays reachable from a browser.
+	h := w.Header()
+	h[constants.HeaderVary] = []string{constants.HeaderAccept}
+	if acceptsHTML(r) && !r.URL.Query().Has("json") {
+		s.serveWebAsset(w, r, webIndex)
+		return
+	}
 	base := s.publicURL(r)
 	out, err := json.Marshal(map[string]any{
 		"name":       "minecraft-version-archive",
 		"public_url": base,
 		"endpoints": map[string]string{
+			"docs":         "/docs",
 			"health":       "/health",
 			"manifest":     "/mc/game/version_manifest_v2.json",
 			"versions":     "/versions/{file}",

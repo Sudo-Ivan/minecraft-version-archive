@@ -1,0 +1,23 @@
+{
+  "runs": [
+    {
+      "at": "2025-10-25",
+      "shape": "Narrative Workflow",
+      "draw": "9f75da",
+      "genre": "playful",
+      "theme": "Arcade (by request: pixel, minecraft inspired)",
+      "axes": "dark/pixel/chromatic-ember",
+      "posture": "full-palette",
+      "hero": "Stage",
+      "nav": "edge bar",
+      "footer": "mast",
+      "imagery": "none",
+      "photos": 0,
+      "entry": "internal/server/web/assets/site.css",
+      "fingerprint": "route register as a lit menu sheet, ember cursor row on the manifest path, Silkscreen live count",
+      "sections": ["hero+register", "upstream map", "integrity", "host your own", "footer"],
+      "waived": ["77 close: working copy control carries mass", "77 docs: Long Document reference, 12 sections"],
+      "prompt": "embedded instance page + api docs, minecraft/pixel themed, no mojang assets"
+    }
+  ]
+}

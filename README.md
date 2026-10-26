@@ -281,7 +281,9 @@ A persistent SHA1 index at `data/inventory/sha1_index.json` records every verifi
 
 | Path | Description |
 |------|-------------|
-| `/` | JSON index with public URL and endpoint list |
+| `/` | Embedded landing page for browsers (`Accept: text/html`); JSON index with public URL and endpoint list otherwise (`?json` forces JSON) |
+| `/docs` | API reference page |
+| `/web/{file}` | Site assets (stylesheets, fonts) |
 | `/mc/game/version_manifest_v2.json` | Mirrored manifest with local URLs |
 | `/versions/{id}.json` | Version metadata |
 | `/java` | Bulk Java runtime index (`major_version`, `component` per version) |

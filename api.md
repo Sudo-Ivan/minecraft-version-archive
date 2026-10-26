@@ -17,11 +17,14 @@ Discover at runtime:
 GET /
 ```
 
+`GET /` negotiates on `Accept`: browsers (`Accept: text/html`) receive the embedded site; other clients receive the JSON index below. `GET /?json` forces the JSON response from any client. `GET /docs` serves the API reference page.
+
 ```json
 {
   "name": "minecraft-version-archive",
   "public_url": "https://minecraft.example.com",
   "endpoints": {
+    "docs": "/docs",
     "health": "/health",
     "manifest": "/mc/game/version_manifest_v2.json",
     "versions": "/versions/{file}",

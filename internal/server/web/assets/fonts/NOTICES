@@ -1,0 +1,18 @@
+Vendored web fonts, latin subset, woff2.
+
+bungee-latin-400-normal.woff2
+  Bungee 400, David Jonathan Ross
+  via @fontsource/bungee 5.3.0 (npm)
+  SIL Open Font License 1.1
+
+chivo-latin-400-normal.woff2
+chivo-latin-700-normal.woff2
+chivo-latin-900-normal.woff2
+  Chivo 400, 700 and 900, Omnibus-Type
+  via @fontsource/chivo 5.3.0 (npm)
+  SIL Open Font License 1.1
+
+silkscreen-latin-700-normal.woff2
+  Silkscreen 700, Jason Kottke
+  via @fontsource/silkscreen 5.3.0 (npm)
+  SIL Open Font License 1.1
