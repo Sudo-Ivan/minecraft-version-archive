@@ -44,6 +44,16 @@
     document.querySelectorAll('[data-version-count]').forEach(function (el) {
       el.textContent = String(inv.versions.length);
     });
+    if (typeof inv.bytes === 'number' && inv.bytes > 0) {
+      var units = ['B', 'KB', 'MB', 'GB', 'TB'];
+      var n = inv.bytes, u = 0;
+      while (n >= 1024 && u < units.length - 1) { n /= 1024; u += 1; }
+      if (n < 10 && u > 0) { n *= 1024; u -= 1; }
+      var text = ' \u00b7 ' + (u === 0 ? n : n.toFixed(1)) + ' ' + units[u];
+      document.querySelectorAll('[data-archive-size]').forEach(function (el) {
+        el.textContent = text;
+      });
+    }
   }).catch(function () {});
 
   var railLinks = Array.prototype.slice.call(document.querySelectorAll('.doc-rail a[href^="#"]'));

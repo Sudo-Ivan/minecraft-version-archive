@@ -50,7 +50,7 @@ code, kbd { font-size: 0.9em; }
 .hero { min-height: 100dvh; display: grid; align-items: center; padding-top: var(--space-3xl); padding-bottom: var(--space-xl); }
 .hero__grid { display: grid; grid-template-columns: 5fr 7fr; gap: var(--space-3xl); align-items: center; }
 .hero__text { min-width: 0; padding-top: var(--space-2xl); }
-.hero h1 { margin-bottom: var(--space-lg); }
+.hero h1 { margin-bottom: var(--space-lg); font-size: clamp(2.5rem, 4vw, 3.5rem); }
 .hero .lead { color: var(--color-ink-2); margin-bottom: var(--space-xl); }
 .hero__actions { display: flex; flex-wrap: wrap; gap: var(--space-sm); align-items: stretch; }
 
@@ -58,7 +58,8 @@ code, kbd { font-size: 0.9em; }
 .copyfield { display: flex; align-items: stretch; width: 100%; max-width: 34rem; min-width: 0; border: var(--rule-bar) solid var(--color-rule); background: var(--color-paper-2); }
 .copyfield code { flex: 1; min-width: 0; display: flex; align-items: center; padding: 0 var(--space-md); font-size: var(--text-sm); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .copyfield .btn { border: 0; border-left: var(--rule-bar) solid var(--color-ink); box-shadow: none; }
-.copyfield .btn:active { translate: 0; }
+.copyfield .btn:hover, .copyfield .btn:active { translate: 0; box-shadow: none; }
+.copyfield .btn:hover { background: var(--color-accent-2); }
 
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-xs); min-height: 48px; padding: 0 var(--space-lg); border: var(--rule-bar) solid var(--color-ink); border-radius: var(--radius-card); background: var(--color-accent); color: var(--color-accent-ink); font: 700 var(--text-md)/1 var(--font-body); white-space: nowrap; text-decoration: none; cursor: pointer; box-shadow: var(--shadow-card); transition: translate var(--dur-micro) var(--ease-out), box-shadow var(--dur-micro) var(--ease-out); }
 .btn:hover { translate: -1px -1px; box-shadow: 7px 7px 0 var(--color-accent-2); }
@@ -94,9 +95,6 @@ code, kbd { font-size: 0.9em; }
 
 /* sections */
 section { padding-block: var(--space-2xl); }
-.stage { border-top: var(--rule-hair) solid var(--color-rule); }
-.stage__head { display: grid; grid-template-columns: 5fr 7fr; gap: var(--gap-columns); align-items: baseline; margin-bottom: var(--space-2xl); }
-.stage__head .lead { color: var(--color-ink-2); }
 .section-head { max-width: 30ch; margin-bottom: var(--space-lg); }
 .section-lead { color: var(--color-ink-2); max-width: 52ch; margin-bottom: var(--space-2xl); }
 
@@ -127,11 +125,6 @@ table.spec td:last-child { color: var(--color-ink-2); }
 .rows p { color: var(--color-ink-2); max-width: 65ch; }
 .rows .num { display: inline-block; font-size: var(--text-sm); color: var(--color-accent-2); margin-left: var(--space-sm); }
 
-/* the close */
-.close { border-top: var(--rule-bar) solid var(--color-rule); padding-top: var(--space-3xl); margin-top: var(--space-4xl); }
-.close__grid { display: grid; grid-template-columns: 5fr 7fr; gap: var(--gap-columns); align-items: start; }
-.close .fig { margin-top: var(--space-lg); min-height: 300px; }
-.close__actions { display: flex; flex-wrap: wrap; gap: var(--space-sm); margin-top: var(--space-xl); }
 
 /* footer: a mast */
 .footer { margin-top: var(--section-gap); border-top: var(--rule-bar) solid var(--color-rule); padding-block: var(--space-2xl) var(--space-xl); }
@@ -177,10 +170,9 @@ table.spec td:last-child { color: var(--color-ink-2); }
 
 @media (max-width: 60rem) {
   .hero { min-height: 0; }
-  .hero__grid, .stage__head, .rows > div, .close__grid, .doc-hero__grid, .doc-grid { grid-template-columns: minmax(0, 1fr); }
+  .hero__grid, .rows > div, .doc-hero__grid, .doc-grid { grid-template-columns: minmax(0, 1fr); }
   .hero__grid { gap: var(--space-2xl); }
-  .stage__head .lead { margin-top: calc(-1 * var(--space-lg)); }
-  .artifact-run ol { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: var(--space-xl); }
+    .artifact-run ol { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: var(--space-xl); }
   .doc-rail { position: static; }
   .doc-rail ol { columns: 2; }
 }

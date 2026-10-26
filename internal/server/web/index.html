@@ -70,7 +70,7 @@
         </table>
         <div class="sheet__detail">
           <svg width="52" height="52" viewBox="0 0 52 52" fill="none" stroke="currentColor" stroke-width="1" aria-hidden="true"><path d="M14 6l12 7v14l-12 7-12-7V13z"/><path d="M2 13l12 7 12-7"/><path d="M14 20v14"/><path d="M38 20l10 5.8V37L38 43l-10-6v-11z"/><path d="M28 26l10 5.8L48 26"/><path d="M38 31.8V43"/></svg>
-          <span class="lbl">versions held</span>
+          <span class="lbl">versions held<span data-archive-size></span></span>
           <span class="count" data-version-count>…</span>
         </div>
       </figure>
@@ -119,35 +119,6 @@
         <h3>SHA-256 for Temurin</h3>
         <p>Java archives verify against each major’s checksum.</p>
       </div>
-    </div>
-  </div>
-</section>
-
-<section class="close" aria-labelledby="start">
-  <div class="container">
-    <div class="close__grid">
-      <div>
-        <h2 id="start">Host your own</h2>
-        
-        <div class="close__actions">
-          <div class="copyfield">
-            <code data-manifest-url>/mc/game/version_manifest_v2.json</code>
-            <button class="btn" type="button" data-copy>Copy</button>
-          </div>
-          <a class="btn btn--quiet" href="/docs">API docs</a>
-        </div>
-      </div>
-      <figure class="fig crt">
-        <pre>go build -o bin/mva ./cmd/mva/
-
-./bin/mva archive --all        # every release
-./bin/mva archive-fabric       # fabric meta and maven
-./bin/mva serve                # this site and the mirror
-
-# then point the launcher at:
-/mc/game/version_manifest_v2.json</pre>
-        <figcaption>Serves on :8080 by default.</figcaption>
-      </figure>
     </div>
   </div>
 </section>

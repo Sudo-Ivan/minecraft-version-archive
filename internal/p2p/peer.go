@@ -16,6 +16,7 @@ type Inventory struct {
 	Versions  []string `json:"versions"`
 	Libraries []string `json:"libraries"`
 	Assets    []string `json:"assets"`
+	Bytes     int64    `json:"bytes"`
 }
 
 type Peer struct {

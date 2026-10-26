@@ -573,6 +573,12 @@ func (a *Archiver) VersionCount() int {
 
 func (a *Archiver) BuildInventory() p2p.Inventory {
 	inv := p2p.Inventory{}
+	_ = filepath.Walk(a.layout.Root, func(path string, info os.FileInfo, err error) error {
+		if err == nil && !info.IsDir() {
+			inv.Bytes += info.Size()
+		}
+		return nil
+	})
 	if entries, err := os.ReadDir(a.layout.VersionsDir()); err == nil {
 		for _, e := range entries {
 			if filepath.Ext(e.Name()) == ".json" {
