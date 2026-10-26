@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"minecraft-version-archive/internal/config"
@@ -573,34 +574,26 @@ func (a *Archiver) VersionCount() int {
 
 func (a *Archiver) BuildInventory() p2p.Inventory {
 	inv := p2p.Inventory{}
+	versionsDir := a.layout.VersionsDir()
+	librariesDir := a.layout.LibrariesDir()
+	objectsDir := a.layout.AssetObjectsDir()
 	_ = filepath.Walk(a.layout.Root, func(path string, info os.FileInfo, err error) error {
-		if err == nil && !info.IsDir() {
-			inv.Bytes += info.Size()
+		if err != nil || info.IsDir() {
+			return nil
 		}
-		return nil
-	})
-	if entries, err := os.ReadDir(a.layout.VersionsDir()); err == nil {
-		for _, e := range entries {
-			if filepath.Ext(e.Name()) == ".json" {
-				inv.Versions = append(inv.Versions, e.Name()[:len(e.Name())-5])
+		inv.Bytes += info.Size()
+		switch dir := filepath.Dir(path); {
+		case dir == versionsDir && filepath.Ext(info.Name()) == ".json":
+			name := info.Name()
+			inv.Versions = append(inv.Versions, name[:len(name)-5])
+		case strings.HasPrefix(path, librariesDir+string(filepath.Separator)):
+			rel, err := filepath.Rel(librariesDir, path)
+			if err == nil {
+				inv.Libraries = append(inv.Libraries, filepath.ToSlash(rel))
 			}
+		case strings.HasPrefix(path, objectsDir+string(filepath.Separator)):
+			inv.Assets = append(inv.Assets, info.Name())
 		}
-	}
-	_ = filepath.Walk(a.layout.LibrariesDir(), func(path string, info os.FileInfo, err error) error {
-		if err != nil || info.IsDir() {
-			return nil
-		}
-		rel, err := filepath.Rel(a.layout.LibrariesDir(), path)
-		if err == nil {
-			inv.Libraries = append(inv.Libraries, filepath.ToSlash(rel))
-		}
-		return nil
-	})
-	_ = filepath.Walk(a.layout.AssetObjectsDir(), func(path string, info os.FileInfo, err error) error {
-		if err != nil || info.IsDir() {
-			return nil
-		}
-		inv.Assets = append(inv.Assets, info.Name())
 		return nil
 	})
 	return inv

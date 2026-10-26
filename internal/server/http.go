@@ -250,7 +250,7 @@ func (s *Server) versionCount() int {
 	if snap := s.invSnap.Load(); snap != nil {
 		return snap.versions
 	}
-	return s.archiver.VersionCount()
+	return len(s.cachedInventory(context.Background()).Versions)
 }
 
 func (s *Server) recordProxyError(event string, err error, attrs ...any) {

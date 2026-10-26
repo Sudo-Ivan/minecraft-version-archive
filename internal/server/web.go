@@ -89,6 +89,12 @@ func acceptsHTML(r *http.Request) bool {
 
 func (s *Server) serveWebAsset(w http.ResponseWriter, r *http.Request, a webAsset) {
 	w.Header()[constants.HeaderContentType] = a.ct
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("X-Frame-Options", "DENY")
+	w.Header().Set("Referrer-Policy", "same-origin")
+	if a.ct[0] == constants.ContentTypeHTML[0] {
+		w.Header().Set("Content-Security-Policy", "default-src 'self'; img-src 'self' data:; style-src 'self'; font-src 'self'; script-src 'self'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'")
+	}
 	s.emitTagged(w, r, a.body, a.gz, false, a.cc, a.etag)
 }
 
