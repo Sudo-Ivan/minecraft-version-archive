@@ -2,12 +2,15 @@ package archive
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
+	"time"
 
 	"minecraft-version-archive/internal/config"
 	"minecraft-version-archive/internal/constants"
@@ -20,6 +23,15 @@ import (
 	"minecraft-version-archive/internal/store"
 )
 
+// ErrInProgress is returned by TryRun when an archive run is already active.
+var ErrInProgress = errors.New("archive run already in progress")
+
+// RunInfo is a snapshot of the most recent finished archive run.
+type RunInfo struct {
+	At  time.Time
+	Err error
+}
+
 type Archiver struct {
 	cfg      *config.Config
 	layout   *store.Layout
@@ -30,6 +42,8 @@ type Archiver struct {
 	log      *slog.Logger
 	manifest *mojang.Manifest
 	stats    *stats.Collector
+	runMu    sync.Mutex
+	lastRun  atomic.Pointer[RunInfo]
 }
 
 func New(cfg *config.Config, log *slog.Logger) *Archiver {
@@ -61,7 +75,34 @@ func NewWithStats(cfg *config.Config, log *slog.Logger, st *stats.Collector) *Ar
 	}
 }
 
+// LastRun returns the result of the most recent finished run, or nil when no
+// run has completed yet.
+func (a *Archiver) LastRun() *RunInfo {
+	return a.lastRun.Load()
+}
+
+// Run archives the configured versions, waiting for any run already in
+// progress.
 func (a *Archiver) Run(ctx context.Context) error {
+	a.runMu.Lock()
+	defer a.runMu.Unlock()
+	return a.runLocked(ctx)
+}
+
+// TryRun runs the archiver unless another run is already active, in which case
+// it returns ErrInProgress.
+func (a *Archiver) TryRun(ctx context.Context) error {
+	if !a.runMu.TryLock() {
+		return ErrInProgress
+	}
+	defer a.runMu.Unlock()
+	return a.runLocked(ctx)
+}
+
+func (a *Archiver) runLocked(ctx context.Context) (err error) {
+	defer func() {
+		a.lastRun.Store(&RunInfo{At: time.Now(), Err: err})
+	}()
 	if err := a.layout.Ensure(); err != nil {
 		return err
 	}
@@ -103,7 +144,9 @@ func (a *Archiver) Run(ctx context.Context) error {
 	)
 
 	prog := NewProgress(len(pending), a.log)
-	go prog.Run(ctx)
+	progCtx, progCancel := context.WithCancel(ctx)
+	defer progCancel()
+	go prog.Run(progCtx)
 
 	var wg sync.WaitGroup
 	errCh := make(chan error, len(pending))

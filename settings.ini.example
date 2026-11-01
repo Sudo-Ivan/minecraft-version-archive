@@ -17,6 +17,8 @@ server_only = false
 workers = 8
 retry_max = 5
 retry_base_ms = 500
+auto_refresh = true
+refresh_min = 60
 ; agent_id = my-agent-1
 ; coordinator_stale_sec = 3600
 

@@ -202,6 +202,64 @@ enabled = false
 	}
 }
 
+func TestLoadAutoRefreshDefaults(t *testing.T) {
+	cfg, err := Load(filepath.Join(t.TempDir(), "missing.ini"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.AutoRefresh {
+		t.Fatal("AutoRefresh should default to true")
+	}
+	if cfg.RefreshMin != constants.DefaultRefreshMin {
+		t.Fatalf("RefreshMin = %d", cfg.RefreshMin)
+	}
+}
+
+func TestLoadRefreshFromINIAndEnv(t *testing.T) {
+	dir := t.TempDir()
+	ini := filepath.Join(dir, "settings.ini")
+	if err := os.WriteFile(ini, []byte(`
+[archive]
+auto_refresh = false
+refresh_min = 15
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := Load(ini)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.AutoRefresh {
+		t.Fatal("AutoRefresh should be false from ini")
+	}
+	if cfg.RefreshMin != 15 {
+		t.Fatalf("RefreshMin = %d", cfg.RefreshMin)
+	}
+
+	t.Setenv(constants.EnvPrefix+"AUTO_REFRESH", "true")
+	t.Setenv(constants.EnvPrefix+"REFRESH_MIN", "30")
+	cfg, err = Load(ini)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.AutoRefresh {
+		t.Fatal("MVA_AUTO_REFRESH should override ini")
+	}
+	if cfg.RefreshMin != 30 {
+		t.Fatalf("RefreshMin = %d", cfg.RefreshMin)
+	}
+}
+
+func TestValidateRefreshMinFallback(t *testing.T) {
+	cfg := &Config{CacheBytes: 1, RefreshMin: 0}
+	if err := cfg.validate(); err != nil {
+		t.Fatal(err)
+	}
+	if cfg.RefreshMin != constants.DefaultRefreshMin {
+		t.Fatalf("RefreshMin = %d", cfg.RefreshMin)
+	}
+}
+
 func TestResolveVersionIDsFromFile(t *testing.T) {
 	dir := t.TempDir()
 	versions := filepath.Join(dir, "versions.txt")

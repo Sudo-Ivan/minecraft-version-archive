@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"minecraft-version-archive/internal/archive"
+	"minecraft-version-archive/internal/buildinfo"
 	"minecraft-version-archive/internal/config"
 	"minecraft-version-archive/internal/constants"
 	"minecraft-version-archive/internal/humanlog"
@@ -57,8 +58,10 @@ Java (Eclipse Temurin, after vanilla versions are archived):
 
 Optional:
   -settings path      Settings file (auto-detects settings.ini if present)
+  -version            Print version
 
-Environment: MVA_DATA_DIR, MVA_LISTEN, MVA_VERSIONS, MVA_ARCHIVE_ALL, ...
+Environment: MVA_DATA_DIR, MVA_LISTEN, MVA_VERSIONS, MVA_ARCHIVE_ALL,
+MVA_AUTO_REFRESH, MVA_REFRESH_MIN, ...
 `
 
 const archiveUsageText = `Usage: mva archive [options] [version...]
@@ -160,7 +163,13 @@ var errHelp = errors.New("help")
 
 func main() {
 	settings := flag.String("settings", "", "settings.ini path (optional, auto-detected)")
+	showVersion := flag.Bool("version", false, "print version")
 	flag.Parse()
+
+	if *showVersion {
+		fmt.Printf("mva %s\n", buildinfo.Version)
+		return
+	}
 
 	log := slog.New(humanlog.New(os.Stderr))
 
@@ -254,8 +263,11 @@ func main() {
 		if n := layout.CleanStaleParts(time.Duration(cfg.CoordinatorStaleSec) * time.Second); n > 0 {
 			log.Info("removed stale partial downloads", "count", n)
 		}
-		log.Info("starting server", "data", cfg.DataDir, "listen", cfg.Listen, "public", cfg.PublicURL, "block_scanners", cfg.BlockScanners, "stats_stdout", cfg.StatsStdout)
+		log.Info("starting server", "data", cfg.DataDir, "listen", cfg.Listen, "public", cfg.PublicURL, "block_scanners", cfg.BlockScanners, "stats_stdout", cfg.StatsStdout, "auto_refresh", cfg.AutoRefresh, "refresh_min", cfg.RefreshMin)
 		srv := server.New(cfg, archiver, log)
+		if cfg.AutoRefresh {
+			srv.StartAutoRefresh(ctx)
+		}
 		if cfg.StatsStdout {
 			srv.StartPeriodicStats(ctx, os.Stdout, constants.StatsStdoutInterval)
 		}
@@ -271,7 +283,7 @@ func main() {
 			os.Exit(1)
 		}
 	case "version":
-		println("mva dev")
+		fmt.Printf("mva %s\n", buildinfo.Version)
 	default:
 		log.Error("unknown command", "cmd", cmd, "hint", "run mva help")
 		os.Exit(1)
@@ -287,6 +299,8 @@ func parseServeArgs(cfg *config.Config, args []string) error {
 	trustProxy := fs.Bool("trust-proxy", false, "use X-Forwarded-Proto/Host behind a reverse proxy")
 	proxyOnMiss := fs.Bool("proxy-on-miss", false, "fetch missing files from Mojang on request")
 	noProxyCache := fs.Bool("no-proxy-cache", false, "do not save proxied files to data_dir")
+	refreshMin := fs.Int("refresh-min", 0, "minutes between archive refreshes (default 60, config refresh_min)")
+	noRefresh := fs.Bool("no-refresh", false, "disable automatic archive refresh")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -305,6 +319,13 @@ func parseServeArgs(cfg *config.Config, args []string) error {
 	}
 	if *noProxyCache {
 		cfg.ProxyCache = false
+	}
+	if *refreshMin > 0 {
+		cfg.RefreshMin = *refreshMin
+		cfg.AutoRefresh = true
+	}
+	if *noRefresh {
+		cfg.AutoRefresh = false
 	}
 	return cfg.ApplyServeOverrides(*host, *port, positional, *publicURL)
 }

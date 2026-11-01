@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"minecraft-version-archive/internal/buildinfo"
 	"minecraft-version-archive/internal/constants"
 	"minecraft-version-archive/internal/integrity"
 	"minecraft-version-archive/internal/safepath"
@@ -33,10 +34,11 @@ type Client struct {
 
 func New(retryMax, baseMS int) *Client {
 	return &Client{
-		http:   sharedHTTPClient(constants.FetchTimeout),
-		retry:  retryMax,
-		baseMS: baseMS,
-		locks:  make(map[string]*fileLock),
+		http:    sharedHTTPClient(constants.FetchTimeout),
+		retry:   retryMax,
+		baseMS:  baseMS,
+		headers: map[string]string{"User-Agent": buildinfo.UserAgent()},
+		locks:   make(map[string]*fileLock),
 	}
 }
 
@@ -45,10 +47,11 @@ func NewWithHTTP(httpClient *http.Client, retryMax, baseMS int) *Client {
 		return New(retryMax, baseMS)
 	}
 	return &Client{
-		http:   httpClient,
-		retry:  retryMax,
-		baseMS: baseMS,
-		locks:  make(map[string]*fileLock),
+		http:    httpClient,
+		retry:   retryMax,
+		baseMS:  baseMS,
+		headers: map[string]string{"User-Agent": buildinfo.UserAgent()},
+		locks:   make(map[string]*fileLock),
 	}
 }
 

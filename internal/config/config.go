@@ -32,6 +32,8 @@ type Config struct {
 	AgentID             string
 	RetryMax            int
 	RetryBaseMS         int
+	AutoRefresh         bool
+	RefreshMin          int
 	CacheEnabled        bool
 	CacheEntries        int
 	CacheBytes          int64
@@ -83,6 +85,8 @@ func Load(path string) (*Config, error) {
 		AgentID:             get(ini, constants.INISectionArchive, "agent_id", ""),
 		RetryMax:            getInt(ini, constants.INISectionArchive, "retry_max", constants.DefaultRetryMax),
 		RetryBaseMS:         getInt(ini, constants.INISectionArchive, "retry_base_ms", constants.DefaultRetryBaseMS),
+		AutoRefresh:         getBool(ini, constants.INISectionArchive, "auto_refresh", true),
+		RefreshMin:          getInt(ini, constants.INISectionArchive, "refresh_min", constants.DefaultRefreshMin),
 		CacheEnabled:        getBool(ini, constants.INISectionCache, "enabled", true),
 		CacheEntries:        getInt(ini, constants.INISectionCache, "max_entries", constants.DefaultCacheEntries),
 		CacheShards:         getInt(ini, constants.INISectionCache, "shards", constants.DefaultCacheShards),
@@ -290,6 +294,9 @@ func (c *Config) validate() error {
 	if c.CoordinatorStaleSec < 1 {
 		c.CoordinatorStaleSec = 1
 	}
+	if c.RefreshMin < 1 {
+		c.RefreshMin = constants.DefaultRefreshMin
+	}
 	if c.CacheBytes < 1 {
 		return fmt.Errorf("cache size must be positive")
 	}
@@ -377,6 +384,14 @@ func applyEnv(c *Config) {
 	if v := os.Getenv(constants.EnvPrefix + "RETRY_BASE_MS"); v != "" {
 		if n, err := strconv.Atoi(v); err == nil {
 			c.RetryBaseMS = n
+		}
+	}
+	if v := os.Getenv(constants.EnvPrefix + "AUTO_REFRESH"); v != "" {
+		c.AutoRefresh = parseBool(v)
+	}
+	if v := os.Getenv(constants.EnvPrefix + "REFRESH_MIN"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			c.RefreshMin = n
 		}
 	}
 	if v := os.Getenv(constants.EnvPrefix + "CACHE_ENABLED"); v != "" {

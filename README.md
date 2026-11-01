@@ -101,7 +101,11 @@ data/fabric/maven/...         # maven.fabricmc.net artifacts
 ./bin/mva serve --public-url https://minecraft.example.com
 ./bin/mva serve --proxy-on-miss
 ./bin/mva serve --proxy-on-miss --no-proxy-cache
+./bin/mva serve --refresh-min 30
+./bin/mva serve --no-refresh
 ```
+
+While serving, mva re-runs the archive every `refresh_min` minutes (default 60, `auto_refresh = true`) so new Mojang releases are picked up automatically. The refresh uses the same version selection as `mva archive`: with no explicit selection it keeps the latest release archived, and `archive_all` keeps every matching version. Runs are idempotent and skip already-archived versions. `GET /health` reports `last_archive` and `last_archive_error` when set.
 
 Run behind nginx or Caddy with TLS. Set `public_url` to your external URL and enable `trust_proxy` when the proxy sets `X-Forwarded-Proto` and `X-Forwarded-Host`.
 
@@ -157,6 +161,7 @@ Settings are optional. With no `settings.ini` and no environment variables, thes
 | Listen address | `:8080` |
 | Public URL | `http://localhost:8080` (derived from listen) |
 | Archive target | Latest Mojang release |
+| Auto-refresh | Every 60 minutes while serving |
 | Cache | Enabled, 512 MB, 512 entries, 256 shards |
 
 To customize, copy the example settings file:
@@ -241,6 +246,8 @@ trust_proxy = true
 | `MVA_WORKERS` | Parallel archive workers (default 8) |
 | `MVA_AGENT_ID` | Coordinator agent name for multi-instance archive |
 | `MVA_COORDINATOR_STALE` | Seconds before reclaiming stale version claims |
+| `MVA_AUTO_REFRESH` | Re-archive on a timer while serving (default `true`) |
+| `MVA_REFRESH_MIN` | Minutes between archive refreshes (default 60) |
 | `MVA_INCLUDE_SNAPSHOTS` | Include snapshots when `archive_all` is set |
 | `MVA_INCLUDE_PRERELEASES` | Include pre-releases when `archive_all` is set |
 | `MVA_INCLUDE_RC` | Include release candidates when `archive_all` is set |

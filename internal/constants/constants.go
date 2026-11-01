@@ -44,6 +44,8 @@ const (
 
 	DefaultCoordinatorStale = 3600
 
+	DefaultRefreshMin = 60
+
 	FileManifest    = "version_manifest_v2.json"
 	FilePartSuffix  = ".part"
 	FileVersionJSON = ".json"

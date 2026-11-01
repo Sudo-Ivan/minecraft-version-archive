@@ -199,7 +199,24 @@ func (s *Server) handleRoot(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	w.Header()[constants.HeaderContentType] = constants.ContentTypeJSON
-	s.emitTagged(w, r, constants.HealthBody, nil, false, constants.CacheControlNoStore, "")
+	last := s.archiver.LastRun()
+	if last == nil {
+		s.emitTagged(w, r, constants.HealthBody, nil, false, constants.CacheControlNoStore, "")
+		return
+	}
+	fields := map[string]any{
+		"status":       "ok",
+		"last_archive": last.At.UTC().Format(time.RFC3339),
+	}
+	if last.Err != nil {
+		fields["last_archive_error"] = last.Err.Error()
+	}
+	out, err := json.Marshal(fields)
+	if err != nil {
+		s.emitTagged(w, r, constants.HealthBody, nil, false, constants.CacheControlNoStore, "")
+		return
+	}
+	s.emitTagged(w, r, out, nil, false, constants.CacheControlNoStore, "")
 }
 
 func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {

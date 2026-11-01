@@ -345,6 +345,14 @@ GET /health
 {"status":"ok"}
 ```
 
+When an archive run has finished (startup auto-refresh or a later tick), the response also reports the last run:
+
+```json
+{"status":"ok","last_archive":"2026-11-01T21:59:09Z","last_archive_error":"..."}
+```
+
+`last_archive` is the UTC finish time. `last_archive_error` is present only when the last run failed.
+
 ### Stats (when enabled)
 
 ```http

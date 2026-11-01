@@ -3,6 +3,7 @@ package archive
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"log/slog"
 	"net/http"
@@ -99,5 +100,18 @@ retry_base_ms = 10
 	}
 	if !strings.Contains(string(data), "http://mirror.test/jars/client/testver.jar") {
 		t.Fatalf("version json not rewritten: %s", data)
+	}
+}
+
+func TestTryRunBusy(t *testing.T) {
+	cfg := &config.Config{DataDir: t.TempDir(), Workers: 1, CacheBytes: 1}
+	a := New(cfg, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	if a.LastRun() != nil {
+		t.Fatal("LastRun should be nil before any run")
+	}
+	a.runMu.Lock()
+	defer a.runMu.Unlock()
+	if err := a.TryRun(context.Background()); !errors.Is(err, ErrInProgress) {
+		t.Fatalf("TryRun = %v, want ErrInProgress", err)
 	}
 }
