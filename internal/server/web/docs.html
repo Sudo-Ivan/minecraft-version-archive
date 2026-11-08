@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>API reference · minecraft-version-archive</title>
 <meta name="description" content="HTTP API reference for a minecraft-version-archive mirror: routes, response shapes, hash rules and launcher integration.">
-<link rel="preload" href="/web/fonts/bungee-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/web/fonts/chivo-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/web/fonts/chivo-latin-900-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/web/site.css">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23a9c8e8' stroke-width='1.4'%3E%3Cpath d='M12 2l9 5v10l-9 5-9-5V7z'/%3E%3Cpath d='M3 7l9 5 9-5'/%3E%3Cpath d='M12 12v10'/%3E%3C/svg%3E">
 <script>document.documentElement.classList.add('js');</script>
@@ -33,7 +33,7 @@
         <h1>API reference</h1>
         <p class="lead">Every route this mirror serves, with request shapes and hash rules.</p>
       </div>
-      <figure class="fig crt">
+      <figure class="fig">
         <pre>GET /
 
 Accept: text/html          this site
@@ -88,7 +88,7 @@ Accept: application/json   the endpoint index
         <section id="browse" aria-labelledby="h-browse">
           <h2 id="h-browse">Browse &amp; download</h2>
           <p><code>/versions</code> negotiates like the root: browsers get the version browser, API clients get the catalog JSON. <code>?json</code> forces JSON.</p>
-          <figure class="fig crt">
+          <figure class="fig">
             <pre>GET /versions
 Accept: application/json
 
@@ -149,7 +149,7 @@ Accept: application/json
         <section id="vanilla" aria-labelledby="h-vanilla">
           <h2 id="h-vanilla">Vanilla flow</h2>
           <p>The standard Mojang sequence, with every host swapped for this mirror:</p>
-          <figure class="fig crt">
+          <figure class="fig">
             <pre>1. GET {BASE}/mc/game/version_manifest_v2.json
 2. Pick a version id from manifest.versions[]
 3. GET {BASE}/versions/{id}.json
@@ -184,7 +184,7 @@ Accept: application/json
           <h2 id="h-java">Java runtime</h2>
           <p>Two layers: which Java Mojang expects for a version, and where to fetch Eclipse Temurin for it.</p>
           <h3>Requirement for one version</h3>
-          <figure class="fig crt">
+          <figure class="fig">
             <pre>GET /java/{mcVersion}
 
 {
@@ -206,7 +206,7 @@ Accept: application/json
             </table>
           </div>
           <h3>Bulk index</h3>
-          <figure class="fig crt">
+          <figure class="fig">
             <pre>GET /java
 
 { "versions": [
@@ -219,11 +219,11 @@ Accept: application/json
           <h2 id="h-temurin">Temurin</h2>
           <p>Optional; requires the operator to run <code>mva archive-java</code>. Not every platform and major pair exists upstream.</p>
           <h3>List archived majors</h3>
-          <figure class="fig crt"><pre>GET /java/temurin
+          <figure class="fig"><pre>GET /java/temurin
 
 { "majors": [8, 17, 21] }</pre></figure>
           <h3>Manifest for one major</h3>
-          <figure class="fig crt">
+          <figure class="fig">
             <pre>GET /java/temurin/{major}
 
 { "vendor": "Eclipse Temurin", "major": 21,
@@ -248,7 +248,7 @@ Accept: application/json
             </table>
           </div>
           <h3>Suggested launcher logic</h3>
-          <figure class="fig crt">
+          <figure class="fig">
             <pre>1. GET /java/{mcVersion}          gives major_version, optional temurin path
 2. GET /java/temurin/{major}    gives platforms[], pick by runtimeOS
 3. GET entry.url                downloads the archive
@@ -260,7 +260,7 @@ Accept: application/json
         <section id="fabric" aria-labelledby="h-fabric">
           <h2 id="h-fabric">Fabric</h2>
           <p>Swap the meta and maven host prefixes; the JSON shapes are unchanged.</p>
-          <figure class="fig crt">
+          <figure class="fig">
             <pre>GET /fabric/v2/versions/loader
 GET /fabric/v2/versions/loader/{gameVersion}
 GET /fabric/v2/versions/loader/{gameVersion}/{loaderVersion}
@@ -273,7 +273,7 @@ GET /maven/fabricmc/net/fabricmc/fabric-loader/0.16.9/fabric-loader-0.16.9.jar</
         <section id="polymc" aria-labelledby="h-polymc">
           <h2 id="h-polymc">PolyMC meta</h2>
           <p>Replace <code>meta.polymc.org/v1/</code> or <code>meta.prismlauncher.org/v1/</code> with <code>{BASE}/meta/v1/</code>:</p>
-          <figure class="fig crt">
+          <figure class="fig">
             <pre>GET /meta/v1/index.json
 GET /meta/v1/net.minecraft/index.json
 GET /meta/v1/net.minecraft/{mcVersion}.json

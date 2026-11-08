@@ -113,7 +113,7 @@ func TestWebAssets(t *testing.T) {
 		}
 	}
 
-	resp := get(t, ts.URL+"/web/fonts/bungee-latin-400-normal.woff2", "")
+	resp := get(t, ts.URL+"/web/fonts/chivo-latin-400-normal.woff2", "")
 	resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("font: status = %d", resp.StatusCode)
