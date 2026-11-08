@@ -53,6 +53,8 @@ type Server struct {
 	debugLog      bool
 	invSnap       atomic.Pointer[inventorySnap]
 	invExpiry     atomic.Int64
+	catalog       atomic.Pointer[catalogSnap]
+	catalogFiles  sync.Map
 	javaSnap      atomic.Pointer[javaSnap]
 	javaExpiry    atomic.Int64
 	javaRespCache sync.Map
@@ -132,6 +134,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc(constants.RouteJavaVersion, s.handleJavaVersion)
 	s.mux.HandleFunc(constants.RouteManifest, s.handleManifest)
 	s.mux.HandleFunc(constants.RouteVersions, s.handleVersions)
+	s.mux.HandleFunc(constants.RouteVersionsIndex, s.handleVersionsIndex)
+	s.mux.HandleFunc(constants.RouteVersionsSlash, s.handleVersionsSlash)
 	s.mux.HandleFunc(constants.RouteJars, s.handleJars)
 	s.mux.HandleFunc(constants.RouteLibraries, s.handleLibraries)
 	s.mux.HandleFunc(constants.RouteAssetIdx, s.handleAssetIndexes)
@@ -176,6 +180,7 @@ func (s *Server) handleRoot(w http.ResponseWriter, r *http.Request) {
 			"health":       "/health",
 			"manifest":     "/mc/game/version_manifest_v2.json",
 			"versions":     "/versions/{file}",
+			"catalog":      "/versions",
 			"java":         "/java",
 			"java_version": "/java/{id}",
 			"java_temurin": "/java/temurin",
@@ -315,10 +320,41 @@ func (s *Server) handleManifest(w http.ResponseWriter, r *http.Request) {
 	s.emitTagged(w, r, body, nil, false, constants.CacheControlShort, makeETag(body))
 }
 
+// handleVersionsIndex serves the version browser: HTML for browsers, the
+// JSON catalog for API clients. ?json forces the catalog, mirroring the root
+// negotiation.
+func (s *Server) handleVersionsIndex(w http.ResponseWriter, r *http.Request) {
+	h := w.Header()
+	h[constants.HeaderVary] = []string{constants.HeaderAccept}
+	if acceptsHTML(r) && !r.URL.Query().Has("json") {
+		s.serveWebAsset(w, r, webVersions)
+		return
+	}
+	s.serveCatalog(w, r)
+}
+
+func (s *Server) handleVersionsSlash(w http.ResponseWriter, r *http.Request) {
+	target := "/versions"
+	if r.URL.RawQuery != "" {
+		target += "?" + r.URL.RawQuery
+	}
+	http.Redirect(w, r, target, http.StatusMovedPermanently) //#nosec G710 -- target is the fixed same-origin path /versions; only the query string is user-influenced and cannot change host or scheme.
+}
+
 func (s *Server) handleVersions(w http.ResponseWriter, r *http.Request) {
 	file := r.PathValue("file")
 	if file == "" || strings.Contains(file, "..") || strings.ContainsAny(file, `/\`) {
 		http.NotFound(w, r)
+		return
+	}
+	// Browsers asking for /versions/{id} get the download page; the id must
+	// name a version the mirror actually holds.
+	if !strings.HasSuffix(file, ".json") && acceptsHTML(r) {
+		if s.catalogEntryFor(file) == nil {
+			http.NotFound(w, r)
+			return
+		}
+		s.serveWebAsset(w, r, webVersions)
 		return
 	}
 	path := filepath.Join(s.layout.VersionsDir(), file)

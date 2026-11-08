@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Versions · minecraft-version-archive</title>
+<meta name="description" content="Browse every Minecraft version this mirror archives — client and server jars, asset indexes and Java requirements, with direct download links.">
+<link rel="preload" href="/web/fonts/bungee-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/web/fonts/chivo-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/web/site.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23a9c8e8' stroke-width='1.4'%3E%3Cpath d='M12 2l9 5v10l-9 5-9-5V7z'/%3E%3Cpath d='M3 7l9 5 9-5'/%3E%3Cpath d='M12 12v10'/%3E%3C/svg%3E">
+<script>document.documentElement.classList.add('js');</script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<nav class="nav">
+  <div class="nav__bar">
+    <a class="nav__home" href="/" aria-label="minecraft-version-archive home"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M12 2l9 5v10l-9 5-9-5V7z"/><path d="M3 7l9 5 9-5"/><path d="M12 12v10"/></svg>mva</a>
+    <div class="nav__links">
+      <a href="/versions" aria-current="page">Versions</a>
+      <a href="/docs">API docs</a>
+      <a href="/mc/game/version_manifest_v2.json">Manifest</a>
+      <a href="/health">Health</a>
+    </div>
+  </div>
+</nav>
+
+<header class="ver-hero">
+  <div class="container">
+    <div class="ver-hero__grid">
+      <div class="ver-hero__text">
+        <h1>Version archive</h1>
+        <p class="lead">Client and server jars for every Minecraft version this mirror holds. Pick a cartridge, verify the hash, download.</p>
+      </div>
+      <figure class="sheet crt ver-stats">
+        <figcaption class="sheet__title"><span>SHELF STATS</span><span id="ver-stats-asof">…</span></figcaption>
+        <dl class="ver-stats__list">
+          <div><dt>Versions held</dt><dd class="num" id="stat-versions">…</dd></div>
+          <div><dt>Client jars</dt><dd class="num" id="stat-client">…</dd></div>
+          <div><dt>Server jars</dt><dd class="num" id="stat-server">…</dd></div>
+          <div><dt>Archive size</dt><dd class="num" id="stat-bytes">…</dd></div>
+        </dl>
+      </figure>
+    </div>
+    <div class="ver-controls">
+      <label class="field">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="7" cy="7" r="5"/><path d="M11 11l3.5 3.5"/></svg>
+        <span class="visually-hidden">Filter versions</span>
+        <input type="search" id="ver-q" placeholder="Filter by version id…" autocomplete="off" spellcheck="false" enterkeyhint="search">
+        <button class="field__clear" type="button" id="ver-q-clear" aria-label="Clear filter" hidden>&times;</button>
+      </label>
+      <div class="chips" role="group" aria-label="Filter by release type">
+        <button class="chip" type="button" data-type="all" aria-pressed="true">All</button>
+        <button class="chip" type="button" data-type="release" aria-pressed="false">Releases</button>
+        <button class="chip" type="button" data-type="snapshot" aria-pressed="false">Snapshots</button>
+        <button class="chip" type="button" data-type="other" aria-pressed="false">Other</button>
+      </div>
+      <span class="ver-count num" id="ver-count" role="status" aria-live="polite"></span>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+  <div class="container">
+
+    <section id="view-list" aria-labelledby="h-list">
+      <h2 class="visually-hidden" id="h-list">Archived versions</h2>
+      <figure class="sheet crt ver-sheet">
+        <figcaption class="sheet__title"><span>VERSION REGISTER</span><span>GET /versions</span></figcaption>
+        <div class="spec-wrap">
+          <table class="register catalog">
+            <thead>
+              <tr>
+                <th scope="col">Version</th>
+                <th scope="col">Type</th>
+                <th scope="col">Released</th>
+                <th scope="col">Client jar</th>
+                <th scope="col">Server jar</th>
+                <th scope="col">Assets</th>
+                <th scope="col">Java</th>
+                <th scope="col"><span class="visually-hidden">Links</span></th>
+              </tr>
+            </thead>
+            <tbody id="catalog-body">
+              <tr class="ver-state-row"><td colspan="8"><span class="ver-state" id="ver-loading">Reading the shelf…</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="ver-foot">
+          <span class="ver-legend">Sizes are Mojang’s declared bytes. A muted size fetches from upstream on first request.</span>
+          <a href="/versions?json">JSON catalog</a>
+        </div>
+      </figure>
+      <noscript>
+        <p class="ver-noscript">The version browser needs JavaScript. The same data is available as <a href="/versions?json">JSON</a>, and jars live under <code>/jars/{kind}/{id}.jar</code>.</p>
+      </noscript>
+    </section>
+
+    <section id="view-detail" hidden>
+      <div id="detail-root"></div>
+    </section>
+
+  </div>
+</main>
+
+<footer class="footer">
+  <div class="container">
+    <div class="footer__mark"><svg width="30" height="30" viewBox="0 0 52 52" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M26 4l20 11v22L26 48 6 37V15z"/><path d="M6 15l20 11 20-11"/><path d="M26 26v22"/></svg>mva</div>
+    <nav class="footer__links" aria-label="Footer">
+      <a href="/">Home</a>
+      <a href="/docs">API docs</a>
+      <a href="/versions?json">Version catalog (JSON)</a>
+      <a href="/mc/game/version_manifest_v2.json">Manifest</a>
+      <a href="/health">Health</a>
+    </nav>
+    <p class="footer__colophon">Fonts vendored, no CDN. Apache-2.0. Unofficial mirror; Minecraft is a Mojang Synergies AB trademark.</p>
+  </div>
+</footer>
+
+<template id="tpl-row">
+  <tr class="ver-row">
+    <td class="ver-id"><a class="ver-link num" href="#"></a></td>
+    <td><span class="badge"></span></td>
+    <td class="num ver-date"></td>
+    <td class="ver-file"></td>
+    <td class="ver-file"></td>
+    <td class="ver-assets"></td>
+    <td class="ver-java num"></td>
+    <td class="ver-actions"><a class="ver-json" href="#" rel="noopener">JSON</a></td>
+  </tr>
+</template>
+
+<template id="tpl-file">
+  <a class="dl" href="#" download>
+    <span class="dl__size num"></span>
+    <span class="dl__flag"></span>
+  </a>
+</template>
+
+<template id="tpl-detail">
+  <div class="ver-detail">
+  <nav class="ver-back" aria-label="Breadcrumb"><a href="/versions">&larr; version register</a></nav>
+  <header class="ver-detail__head">
+    <div class="ver-detail__idwrap">
+      <h1 class="ver-detail__id num"></h1>
+      <p class="ver-detail__meta"><span class="badge"></span><span class="ver-detail__date num"></span></p>
+    </div>
+    <div class="ver-detail__quick">
+      <div class="copyfield">
+        <code data-detail-json></code>
+        <button class="btn" type="button" data-copy data-copy-target="[data-detail-json]">Copy</button>
+      </div>
+      <a class="btn btn--quiet" href="#" data-detail-page>Open JSON</a>
+    </div>
+  </header>
+
+  <h2 class="section-head">Download bay</h2>
+  <div class="ver-bay" id="detail-bay"></div>
+
+  <h2 class="section-head">Manifest files</h2>
+  <div class="spec-wrap">
+    <table class="spec">
+      <thead><tr><th scope="col">File</th><th scope="col">Detail</th><th scope="col">Link</th></tr></thead>
+      <tbody id="detail-files"></tbody>
+    </table>
+  </div>
+
+  <h2 class="section-head">Integrity</h2>
+  <div class="rows" id="detail-integrity"></div>
+  </div>
+</template>
+
+<template id="tpl-bay-card">
+  <article class="bay">
+    <header class="bay__head">
+      <h3 class="bay__kind"></h3>
+      <span class="bay__state"></span>
+    </header>
+    <p class="bay__size num"></p>
+    <p class="bay__hash"><span class="mono bay__hashval"></span><button class="bay__copy" type="button" data-copy data-copy-target="" aria-label="Copy SHA-1">copy</button></p>
+    <a class="btn bay__btn" href="#" download></a>
+    <p class="bay__note"></p>
+  </article>
+</template>
+
+<template id="tpl-spec-row">
+  <tr>
+    <th scope="row" class="mono"></th>
+    <td></td>
+    <td class="mono"></td>
+  </tr>
+</template>
+
+<script src="/web/site.js" defer></script>
+</body>
+</html>

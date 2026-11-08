@@ -25,9 +25,10 @@ type webAsset struct {
 }
 
 var (
-	webIndex  webAsset
-	webDocs   webAsset
-	webAssets map[string]webAsset
+	webIndex    webAsset
+	webDocs     webAsset
+	webVersions webAsset
+	webAssets   map[string]webAsset
 )
 
 var webContentTypes = map[string][]string{
@@ -39,6 +40,7 @@ var webContentTypes = map[string][]string{
 func init() {
 	webIndex = loadWebPage("web/index.html")
 	webDocs = loadWebPage("web/docs.html")
+	webVersions = loadWebPage("web/versions.html")
 	webAssets = make(map[string]webAsset)
 	err := fs.WalkDir(webFS, "web/assets", func(p string, d fs.DirEntry, err error) error {
 		if err != nil || d.IsDir() {

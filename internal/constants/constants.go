@@ -65,6 +65,8 @@ const (
 	RouteJavaTemurin    = "GET /java/temurin/{major}"
 	RouteJavaTemurinBin = "GET /java/temurin/{major}/{platform}/{file}"
 	RouteVersions       = "GET /versions/{file}"
+	RouteVersionsIndex  = "GET /versions"
+	RouteVersionsSlash  = "GET /versions/{$}"
 	RouteJars           = "GET /jars/{kind}/{file}"
 	RouteLibraries      = "GET /libraries/{path...}"
 	RouteAssetIdx       = "GET /assets/indexes/{file}"

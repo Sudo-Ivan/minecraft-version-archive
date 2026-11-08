@@ -18,6 +18,7 @@
   <div class="nav__bar">
     <a class="nav__home" href="/" aria-label="minecraft-version-archive home"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M12 2l9 5v10l-9 5-9-5V7z"/><path d="M3 7l9 5 9-5"/><path d="M12 12v10"/></svg>mva</a>
     <div class="nav__links">
+      <a href="/versions">Versions</a>
       <a href="/docs">API docs</a>
       <a href="/mc/game/version_manifest_v2.json">Manifest</a>
       <a href="/health">Health</a>
@@ -36,6 +37,7 @@
             <code data-manifest-url>/mc/game/version_manifest_v2.json</code>
             <button class="btn" type="button" data-copy>Copy</button>
           </div>
+          <a class="btn" href="/versions">Browse versions</a>
           <a class="btn btn--quiet" href="/docs">API docs</a>
         </div>
 
@@ -48,6 +50,8 @@
           <tbody>
             <tr><th scope="rowgroup" colspan="2">Discovery</th></tr>
             <tr><td class="mono">/</td><td>Index</td></tr>
+            <tr><td class="mono">/versions</td><td>Catalog · browser</td></tr>
+            <tr><td class="mono">/versions/{id}</td><td>Download page</td></tr>
             <tr><td class="mono">/health</td><td>Liveness</td></tr>
             <tr><th scope="rowgroup" colspan="2">Vanilla</th></tr>
             <tr class="cursor"><td class="mono">/mc/game/version_manifest_v2.json</td><td>Manifest</td></tr>
@@ -129,6 +133,7 @@
   <div class="container">
     <div class="footer__mark"><svg width="30" height="30" viewBox="0 0 52 52" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M26 4l20 11v22L26 48 6 37V15z"/><path d="M6 15l20 11 20-11"/><path d="M26 26v22"/></svg>mva</div>
     <nav class="footer__links" aria-label="Footer">
+      <a href="/versions">Versions</a>
       <a href="/docs">API docs</a>
       <a href="/?json">Endpoint index (JSON)</a>
       <a href="/mc/game/version_manifest_v2.json">Manifest</a>
