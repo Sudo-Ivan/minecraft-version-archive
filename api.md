@@ -2,7 +2,7 @@
 
 Reference for clients (launchers, mirrors, automation agents) talking to an `mva serve` instance.
 
-The mirror exposes Mojang-compatible paths on a single origin. Point a launcher at `{BASE}` instead of Mojang/Fabric URLs. Archived content is served from disk; missing files return **404** unless `proxy_on_miss` is enabled on the server.
+The mirror exposes Mojang-compatible paths on a single origin. Point a launcher at `{BASE}` instead of Mojang/Fabric URLs. Archived content is served from the configured storage backend (local `data_dir` or an S3 bucket). Missing files return **404** unless `proxy_on_miss` is enabled on the server.
 
 ## Base URL
 

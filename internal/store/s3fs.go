@@ -387,7 +387,7 @@ func (s *s3fs) WriteFileExclusive(abs string, data []byte, perm fs.FileMode) err
 		ContentType:  contentTypeFor(key),
 		UserMetadata: s.checksumMetadata(data),
 	}
-	opts.SetMatchETagExcept("*") // If-None-Match: * — create only if absent
+	opts.SetMatchETagExcept("*") // If-None-Match: * creates only when absent
 	_, err = s.cli.PutObject(s.ctx, s.bucket, key, bytes.NewReader(data), int64(len(data)), opts)
 	if err == nil {
 		return nil
@@ -659,7 +659,7 @@ func (s *s3fs) walkKeyDir(key, abs string, fn vfs.WalkFunc) error {
 		if err := fn(fabs, s3WalkEntry{info: finfo}, nil); err != nil {
 			if err == fs.SkipDir {
 				// SkipDir on a file skips remaining entries of this dir;
-				// drain handled by returning early — approximation: stop this level.
+				// approximation: stop this level.
 				return nil
 			}
 			return err

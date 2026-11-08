@@ -46,17 +46,25 @@ timeout_sec = 30
 ; Backblaze B2, DigitalOcean Spaces, ...). When enabled, archive content,
 ; coordinator state, and indexes live in the bucket; data_dir is still used
 ; for in-flight .part downloads and upload staging.
+; bucket is required. prefix is an optional key prefix inside the bucket.
+; endpoint takes host[:port] or an http(s):// URL; empty means AWS S3.
+; path_style is for MinIO and most S3-compatible stores.
+; use_ssl only applies to scheme-less endpoints; localhost defaults to HTTP.
+; (use_ssl is auto-detected when unset, so it is not shown here.)
+; anonymous = true never signs requests (public buckets).
+; access_key/secret_key/session_token are for private buckets; when unset,
+; the standard AWS credential chain is used (env, shared file, IAM).
+; redirect serves files via presigned URLs; redirect_ttl sets their lifetime.
 [s3]
 ; enabled = false
 ; bucket = my-minecraft-archive
-; prefix = minecraft            ; optional key prefix inside the bucket
-; endpoint =                    ; host[:port] or https://... ; empty = AWS S3
-; region =                      ; e.g. us-east-1, auto1 (R2), etc.
-; path_style = false            ; true for MinIO and most S3-compatible stores
-; use_ssl = true                ; ignored when endpoint has an http(s) scheme
-; anonymous = false             ; public buckets: never sign requests
-; access_key =                  ; private buckets: static credentials
+; prefix = minecraft
+; endpoint =
+; region =
+; path_style = false
+; anonymous = false
+; access_key =
 ; secret_key =
 ; session_token =
-; redirect = false              ; serve files via presigned URL redirects
-; redirect_ttl = 15m            ; presigned URL lifetime
+; redirect = false
+; redirect_ttl = 15m

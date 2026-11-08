@@ -111,7 +111,7 @@ Run behind nginx or Caddy with TLS. Set `public_url` to your external URL and en
 
 ### Missing files and upstream proxy
 
-By default, requests for files not on disk return **HTTP 404**. The local manifest only lists archived versions, so launchers normally never request versions you have not archived.
+By default, requests for files not in storage return **HTTP 404**. The local manifest only lists archived versions, so launchers normally never request versions you have not archived.
 
 Enable on-demand fetching from Mojang:
 
@@ -130,12 +130,12 @@ proxy_cache = true
 | Setting | Default | Effect |
 |---------|---------|--------|
 | `proxy_on_miss` | `false` | Fetch missing manifest, version JSON, jars, libraries, assets, Fabric meta, and Fabric Maven from upstream |
-| `proxy_cache` | `true` | Save proxied files into `data_dir` for later requests |
-| `--no-proxy-cache` | off | Passthrough only: serve from Mojang without writing to disk |
+| `proxy_cache` | `true` | Save proxied files into the data backend for later requests |
+| `--no-proxy-cache` | off | Passthrough only: serve from Mojang without storing a copy |
 
 Environment: `MVA_PROXY_ON_MISS=true`, `MVA_PROXY_CACHE=false` for passthrough.
 
-When `proxy_cache` is enabled, the first request for a missing file downloads from Mojang, serves it to the client, and stores it locally. Later requests are served from disk like archived content.
+When `proxy_cache` is enabled, the first request for a missing file downloads from Mojang, serves it to the client, and stores it in the data backend. Later requests are served like archived content.
 
 ### Export and import
 
@@ -238,27 +238,27 @@ trust_proxy = true
 
 ### S3 object storage
 
-The whole data directory can live in any S3-compatible bucket — AWS S3, MinIO, Cloudflare R2, Backblaze B2, DigitalOcean Spaces, and similar. Enable it in `[s3]`:
+The whole data directory can live in any S3-compatible bucket: AWS S3, MinIO, Cloudflare R2, Backblaze B2, DigitalOcean Spaces, and similar. Enable it in `[s3]`:
 
 ```ini
 [s3]
 enabled = true
 bucket = my-minecraft-archive
-prefix = minecraft          ; optional key prefix inside the bucket
-endpoint = s3.us-east-1.amazonaws.com   ; omit for AWS S3
+prefix = minecraft
+endpoint = s3.us-east-1.amazonaws.com
 region = us-east-1
-path_style = false          ; true for MinIO and most S3-compatible stores
+path_style = false
 ```
 
-Private buckets authenticate with `access_key`/`secret_key`/`session_token`, or fall back to the standard AWS credential chain (`AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY`, shared credentials file, instance metadata). Public buckets need no credentials at all — or set `anonymous = true` to guarantee unsigned requests.
+Omit `endpoint` for AWS S3. Private buckets authenticate with `access_key`, `secret_key`, and `session_token`, or fall back to the standard AWS credential chain (`AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY`, shared credentials file, instance metadata). Public buckets need no credentials at all, or set `anonymous = true` to guarantee unsigned requests.
 
-Everything archive-related moves into the bucket: jars, libraries, assets, manifests, version JSON, Fabric and Temurin files, the hash index, and coordinator claims/done markers — so multiple `mva archive` agents can share one bucket safely (claims use conditional writes). `data_dir` remains the local scratch space for in-flight `.part` downloads and upload staging, and `mva export`/`mva import` work against the bucket transparently.
+Everything archive-related moves into the bucket: jars, libraries, assets, manifests, version JSON, Fabric and Temurin files, the hash index, and coordinator claims and done markers. Multiple `mva archive` agents can share one bucket safely because claims use conditional writes. `data_dir` remains the local scratch space for in-flight `.part` downloads and upload staging, and `mva export`/`mva import` work against the bucket transparently.
 
 Serving notes:
 
-- `redirect = true` answers file requests with short-lived presigned URLs so clients download straight from the bucket instead of proxying through `mva` (`redirect_ttl` controls lifetime, default 15m).
-- Uploaded objects carry SHA-1/SHA-256 metadata, so integrity checks are HEAD requests rather than full re-downloads.
-- `endpoint` accepts `host[:port]` or a full `http(s)://` URL; `use_ssl` applies only to scheme-less endpoints and localhost defaults to plain HTTP.
+- `redirect = true` answers file requests with short-lived presigned URLs so clients download straight from the bucket instead of proxying through `mva`. `redirect_ttl` controls the lifetime (default 15m).
+- Uploaded objects carry SHA-1 and SHA-256 metadata, so integrity checks are HEAD requests rather than full re-downloads.
+- `endpoint` accepts `host[:port]` or a full `http(s)://` URL. `use_ssl` applies only to scheme-less endpoints, and localhost defaults to plain HTTP.
 
 Environment overrides: `MVA_S3_ENABLED`, `MVA_S3_BUCKET`, `MVA_S3_PREFIX`, `MVA_S3_ENDPOINT`, `MVA_S3_REGION`, `MVA_S3_ACCESS_KEY`, `MVA_S3_SECRET_KEY`, `MVA_S3_SESSION_TOKEN`, `MVA_S3_ANONYMOUS`, `MVA_S3_PATH_STYLE`, `MVA_S3_USE_SSL`, `MVA_S3_REDIRECT`, `MVA_S3_REDIRECT_TTL`.
 
@@ -284,7 +284,7 @@ Environment overrides: `MVA_S3_ENABLED`, `MVA_S3_BUCKET`, `MVA_S3_PREFIX`, `MVA_
 | `MVA_INVENTORY_TTL` | Inventory cache TTL in seconds |
 | `MVA_TRUST_PROXY` | Trust reverse-proxy forwarded headers |
 | `MVA_PROXY_ON_MISS` | Fetch missing files from Mojang on request |
-| `MVA_PROXY_CACHE` | Save proxied files to `data_dir` (`false` = passthrough) |
+| `MVA_PROXY_CACHE` | Save proxied files to the data backend (`false` = passthrough) |
 | `MVA_STATS_ENABLED` | Enable `GET /stats` |
 | `MVA_P2P_ENABLED` | Query peers before Mojang for missing files |
 | `MVA_PEERS` | Comma-separated peer base URLs |
@@ -303,7 +303,7 @@ Environment overrides: `MVA_S3_ENABLED`, `MVA_S3_BUCKET`, `MVA_S3_PREFIX`, `MVA_
 
 `workers` controls how many versions download at the same time (default 8). Within each version, libraries and assets also download concurrently.
 
-Multiple `mva archive` processes can share the same `data_dir`. A file-based coordinator assigns each version to one agent at a time using claims under `data/coordinator/`. Completed versions are marked in `data/coordinator/done/` so agents skip them.
+Multiple `mva archive` processes can share the same `data_dir`. A file-based coordinator assigns each version to one agent at a time using claims under `data/coordinator/`. Completed versions are marked in `data/coordinator/done/` so agents skip them. With the S3 backend enabled, claims and done markers live in the bucket instead, so agents on different machines can share one archive.
 
 Set a unique `agent_id` or `MVA_AGENT_ID` per machine when running several archivers. Stale claims are reclaimed after `coordinator_stale_sec` (default 3600).
 
@@ -315,11 +315,11 @@ Progress 186/4860 files (3.8%)  |  46.7 MB  |  23.3 MB/s  |  26.1.2
 
 ## Integrity verification
 
-Downloads are verified against Mojang SHA1 and size metadata when those fields are present. Existing files are checked before they are skipped; corrupt or truncated files are removed and re-fetched. Asset objects served from `/assets/objects/{aa}/{hash}` are verified against the hash in the URL path before delivery.
+Downloads are verified against Mojang SHA1 and size metadata when those fields are present. Existing files are checked before they are skipped. Corrupt or truncated files are removed and re-fetched. Asset objects served from `/assets/objects/{aa}/{hash}` are verified against the hash in the URL path before delivery. On the S3 backend, uploaded objects carry SHA-1 and SHA-256 metadata, so verification is a metadata lookup rather than a full read.
 
 ## Hash deduplication
 
-A persistent SHA1 index at `data/inventory/sha1_index.json` records every verified object. Before downloading, the archiver looks up the expected hash and reuses an existing file via hard link (or copy when linking is not possible). Asset objects under `data/assets/objects/` are indexed automatically on startup. Identical jars, libraries, and indexes across versions therefore share disk space instead of being stored twice.
+A persistent SHA1 index at `data/inventory/sha1_index.json` records every verified object. Before downloading, the archiver looks up the expected hash and reuses an existing file via hard link (or copy when linking is not possible). Asset objects under `data/assets/objects/` are indexed automatically on startup. Identical jars, libraries, and indexes across versions therefore share disk space instead of being stored twice. On S3 the index is a bucket object and dedup uses server-side copies instead of hard links.
 
 ## HTTP endpoints
 
@@ -344,7 +344,7 @@ A persistent SHA1 index at `data/inventory/sha1_index.json` records every verifi
 | `/stats` | Metrics (when enabled) |
 | `/health` | Health check |
 
-Range requests and resumable downloads are supported. Popular files can be cached in memory to reduce disk reads.
+Range requests and resumable downloads are supported. Popular files can be cached in memory to reduce backend reads.
 
 Manifest and version JSON URLs are rewritten at serve time using `public_url` or reverse-proxy headers when `trust_proxy` is enabled. Fabric meta responses rewrite `maven.fabricmc.net` library URLs to `{public_url}/maven/fabricmc/`.
 
@@ -381,9 +381,9 @@ The server is designed for thousands of simultaneous launcher downloads.
 
 - **Sharded in-memory cache** spreads hot file lookups across 256 independent locks by default
 - **Coalesced fills** ensure one goroutine loads a file into cache, builds the peer inventory, or fetches an upstream URL while concurrent requests share the result
-- **Sendfile serving** streams large jars and libraries directly from disk without buffering in memory
-- **Streaming proxy** downloads proxy-on-miss jars and libraries straight to disk (SHA1-verified) instead of buffering them in memory, or relays passthrough responses without storing them
-- **Rendered-JSON cache** rewrites the manifest and version JSON only when the file on disk changes
+- **Sendfile serving** streams large jars and libraries directly from the storage backend without buffering in memory
+- **Streaming proxy** downloads proxy-on-miss jars and libraries straight to the data backend (SHA1-verified) instead of buffering them in memory, or relays passthrough responses without storing them
+- **Rendered-JSON cache** rewrites the manifest and version JSON only when the file changes
 - **Integrity cache** skips re-hashing verified asset objects and Temurin binaries until size or mtime changes
 - **Inventory caching** avoids full directory walks on every peer listing and `/java` index request
 - **Java lookup cache** stores per-version `/java/{id}` JSON after first read

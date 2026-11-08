@@ -77,6 +77,16 @@ bucket = ini-bucket
 	}
 }
 
+func TestLoadS3ExampleFileParses(t *testing.T) {
+	cfg, err := Load(filepath.Join("..", "..", "settings.ini.example"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.S3.Enabled {
+		t.Fatal("example file should keep s3 disabled")
+	}
+}
+
 func TestLoadS3Validation(t *testing.T) {
 	path := writeSettings(t, `[s3]
 enabled = true

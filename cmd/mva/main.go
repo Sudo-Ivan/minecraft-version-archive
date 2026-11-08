@@ -61,7 +61,7 @@ Optional:
   -version            Print version
 
 Environment: MVA_DATA_DIR, MVA_LISTEN, MVA_VERSIONS, MVA_ARCHIVE_ALL,
-MVA_AUTO_REFRESH, MVA_REFRESH_MIN, ...
+MVA_AUTO_REFRESH, MVA_REFRESH_MIN, MVA_S3_ENABLED, MVA_S3_BUCKET, ...
 `
 
 const archiveUsageText = `Usage: mva archive [options] [version...]
