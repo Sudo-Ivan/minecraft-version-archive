@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
-	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -26,6 +25,7 @@ import (
 	"minecraft-version-archive/internal/polymc"
 	"minecraft-version-archive/internal/stats"
 	"minecraft-version-archive/internal/store"
+	"minecraft-version-archive/internal/vfs"
 )
 
 var (
@@ -77,9 +77,13 @@ func New(cfg *config.Config, archiver *archive.Archiver, log *slog.Logger) *Serv
 	if cfg.CacheEnabled {
 		mem = cache.NewSharded(cfg.CacheEntries, cfg.CacheBytes, cfg.CacheShards)
 	}
+	layout, lerr := store.NewForConfig(cfg)
+	if lerr != nil {
+		layout = store.NewFailed(cfg.DataDir, lerr)
+	}
 	s := &Server{
 		cfg:       cfg,
-		layout:    store.New(cfg.DataDir),
+		layout:    layout,
 		cache:     mem,
 		loader:    coalesce.New(),
 		invGroup:  coalesce.NewGroup[p2p.Inventory](),
@@ -491,7 +495,7 @@ func (s *Server) handleAssetObject(w http.ResponseWriter, r *http.Request) {
 	}
 	path := s.layout.AssetObjectPath(hash)
 	spec := integrity.Spec{SHA1: hash}
-	dataDir, err := s.layout.Dir()
+	dataDir, err := s.layout.FS()
 	if err != nil {
 		http.NotFound(w, r)
 		return
@@ -584,12 +588,48 @@ func (s *Server) missBig(dest string, target func(ctx context.Context) (string, 
 	}
 }
 
+// presignRedirect returns a presigned object URL for path when the S3
+// backend is configured to serve redirects and the object exists. GET
+// requests only: presigned GET URLs do not validate HEAD.
+func (s *Server) presignRedirect(w http.ResponseWriter, r *http.Request, path string) string {
+	if !s.cfg.S3.Redirect || r.Method != http.MethodGet {
+		return ""
+	}
+	fsys, err := s.layout.FS()
+	if err != nil {
+		return ""
+	}
+	redir, ok := fsys.(vfs.Redirector)
+	if !ok {
+		return ""
+	}
+	if _, err := fsys.Stat(path); err != nil {
+		return ""
+	}
+	ttl := s.cfg.S3.RedirectTTL
+	if ttl <= 0 {
+		ttl = 15 * time.Minute
+	}
+	u, err := redir.PresignGet(path, int64(ttl.Seconds()))
+	if err != nil {
+		s.log.Debug("presign failed", "path", path, "err", err)
+		return ""
+	}
+	return u
+}
+
 func (s *Server) servePath(w http.ResponseWriter, r *http.Request, path string, onMiss ...missHandler) {
 	if s.cache != nil {
 		if data, ok := s.cache.Get(path); ok {
 			s.emitBytes(w, r, data, true)
 			return
 		}
+	}
+
+	if u := s.presignRedirect(w, r, path); u != "" {
+		http.Redirect(w, r, u, http.StatusFound)
+		s.stats.RecordServe(0, false)
+		return
 	}
 
 	f, err := s.layout.OpenFile(path)
@@ -636,7 +676,7 @@ func (s *Server) cacheMaxEntry() int64 {
 	return s.cache.MaxEntryBytes()
 }
 
-func (s *Server) loadCached(ctx context.Context, path string, f *os.File, size int) ([]byte, error) {
+func (s *Server) loadCached(ctx context.Context, path string, f vfs.File, size int) ([]byte, error) {
 	return s.loader.Do(ctx, path, func(context.Context) ([]byte, error) {
 		if s.cache != nil {
 			if data, ok := s.cache.Get(path); ok {

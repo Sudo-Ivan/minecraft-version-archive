@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -259,7 +258,7 @@ func loaderIndexFromGlobalData(data []byte, times map[string]string) ([]byte, er
 
 func aggregateLoaderIndex(layout *store.Layout) ([]byte, error) {
 	loaderDir := filepath.Join(layout.FabricMetaDir(), "v2", "versions", "loader")
-	entries, err := os.ReadDir(loaderDir)
+	entries, err := layout.ReadDir(loaderDir)
 	if err != nil {
 		return nil, fmt.Errorf("no fabric loader metadata archived")
 	}
@@ -377,7 +376,7 @@ func loaderDetailToVersionFile(detail fabric.LoaderDetail, loaderVersion, mcVers
 }
 
 func IntermediaryIndex(layout *store.Layout) ([]byte, error) {
-	entries, err := os.ReadDir(layout.VersionsDir())
+	entries, err := layout.ReadDir(layout.VersionsDir())
 	if err != nil {
 		return nil, err
 	}
@@ -425,7 +424,7 @@ func fabricMCCandidates(layout *store.Layout, mcVersion string) []string {
 	if mcVersion != "" {
 		return []string{mcVersion}
 	}
-	entries, err := os.ReadDir(layout.VersionsDir())
+	entries, err := layout.ReadDir(layout.VersionsDir())
 	if err != nil {
 		return nil
 	}

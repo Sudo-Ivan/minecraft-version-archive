@@ -484,8 +484,12 @@ func runExport(cfg *config.Config, log *slog.Logger, args []string) error {
 		}
 		selected = append(selected, ids...)
 	}
+	layout, err := store.NewForConfig(cfg)
+	if err != nil {
+		return err
+	}
 	log.Info("export started", "source", cfg.DataDir, "dest", dest, "versions", len(selected))
-	result, err := store.ExportZip(cfg.DataDir, dest, store.ExportOptions{Versions: selected})
+	result, err := store.ExportZip(layout, dest, store.ExportOptions{Versions: selected})
 	if err != nil {
 		return err
 	}
@@ -511,8 +515,12 @@ func runImport(cfg *config.Config, log *slog.Logger, args []string) error {
 		return fmt.Errorf("usage: mva import file.zip")
 	}
 	zipPath := fs.Arg(0)
+	layout, err := store.NewForConfig(cfg)
+	if err != nil {
+		return err
+	}
 	log.Info("import started", "source", zipPath, "dest", cfg.DataDir, "replace", *replace)
-	result, err := store.ImportZip(cfg.DataDir, zipPath, *replace)
+	result, err := store.ImportZip(layout, zipPath, *replace)
 	if err != nil {
 		return err
 	}

@@ -182,6 +182,7 @@ Settings load from `settings.ini` when present. Use `-settings path` to pick a d
 | `server` | Inventory cache TTL, reverse-proxy trust |
 | `stats` | Request and throughput metrics endpoint |
 | `p2p` | Peer instances for federated fetching |
+| `s3` | S3-compatible object storage backend |
 
 ### Version selection
 
@@ -235,6 +236,32 @@ trust_proxy = true
 
 `trust_proxy` uses `X-Forwarded-Proto` and `X-Forwarded-Host` when rewriting manifest and version JSON URLs behind a reverse proxy.
 
+### S3 object storage
+
+The whole data directory can live in any S3-compatible bucket — AWS S3, MinIO, Cloudflare R2, Backblaze B2, DigitalOcean Spaces, and similar. Enable it in `[s3]`:
+
+```ini
+[s3]
+enabled = true
+bucket = my-minecraft-archive
+prefix = minecraft          ; optional key prefix inside the bucket
+endpoint = s3.us-east-1.amazonaws.com   ; omit for AWS S3
+region = us-east-1
+path_style = false          ; true for MinIO and most S3-compatible stores
+```
+
+Private buckets authenticate with `access_key`/`secret_key`/`session_token`, or fall back to the standard AWS credential chain (`AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY`, shared credentials file, instance metadata). Public buckets need no credentials at all — or set `anonymous = true` to guarantee unsigned requests.
+
+Everything archive-related moves into the bucket: jars, libraries, assets, manifests, version JSON, Fabric and Temurin files, the hash index, and coordinator claims/done markers — so multiple `mva archive` agents can share one bucket safely (claims use conditional writes). `data_dir` remains the local scratch space for in-flight `.part` downloads and upload staging, and `mva export`/`mva import` work against the bucket transparently.
+
+Serving notes:
+
+- `redirect = true` answers file requests with short-lived presigned URLs so clients download straight from the bucket instead of proxying through `mva` (`redirect_ttl` controls lifetime, default 15m).
+- Uploaded objects carry SHA-1/SHA-256 metadata, so integrity checks are HEAD requests rather than full re-downloads.
+- `endpoint` accepts `host[:port]` or a full `http(s)://` URL; `use_ssl` applies only to scheme-less endpoints and localhost defaults to plain HTTP.
+
+Environment overrides: `MVA_S3_ENABLED`, `MVA_S3_BUCKET`, `MVA_S3_PREFIX`, `MVA_S3_ENDPOINT`, `MVA_S3_REGION`, `MVA_S3_ACCESS_KEY`, `MVA_S3_SECRET_KEY`, `MVA_S3_SESSION_TOKEN`, `MVA_S3_ANONYMOUS`, `MVA_S3_PATH_STYLE`, `MVA_S3_USE_SSL`, `MVA_S3_REDIRECT`, `MVA_S3_REDIRECT_TTL`.
+
 ### Common environment variables
 
 | Variable | Description |
@@ -261,6 +288,16 @@ trust_proxy = true
 | `MVA_STATS_ENABLED` | Enable `GET /stats` |
 | `MVA_P2P_ENABLED` | Query peers before Mojang for missing files |
 | `MVA_PEERS` | Comma-separated peer base URLs |
+| `MVA_S3_ENABLED` | Store the data directory in S3-compatible object storage |
+| `MVA_S3_BUCKET` | S3 bucket name |
+| `MVA_S3_PREFIX` | Key prefix inside the bucket |
+| `MVA_S3_ENDPOINT` | S3 endpoint (`host[:port]` or URL; empty = AWS) |
+| `MVA_S3_REGION` | S3 region |
+| `MVA_S3_ACCESS_KEY` / `MVA_S3_SECRET_KEY` / `MVA_S3_SESSION_TOKEN` | Static credentials for private buckets |
+| `MVA_S3_ANONYMOUS` | Never sign requests (public buckets) |
+| `MVA_S3_PATH_STYLE` | Path-style bucket URLs (MinIO, most compatibles) |
+| `MVA_S3_USE_SSL` | HTTPS for scheme-less endpoints |
+| `MVA_S3_REDIRECT` / `MVA_S3_REDIRECT_TTL` | Serve via presigned URL redirects and their lifetime |
 
 ## Parallel archive and coordination
 

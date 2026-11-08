@@ -7,7 +7,7 @@ import (
 	"io"
 	"strings"
 
-	"minecraft-version-archive/internal/safepath"
+	"minecraft-version-archive/internal/vfs"
 )
 
 type Spec struct {
@@ -41,12 +41,22 @@ func VerifyBytes(data []byte, spec Spec) error {
 	return nil
 }
 
-func VerifyFile(dir *safepath.Dir, abs string, spec Spec) error {
+// VerifyFile checks path against spec. When the backend stores content
+// checksums (vfs.Digester, e.g. object metadata) verification is a metadata
+// lookup; otherwise the file is streamed through the hash.
+func VerifyFile(fsys vfs.FS, abs string, spec Spec) error {
 	if !spec.Known() {
 		return nil
 	}
+	if d, ok := fsys.(vfs.Digester); ok {
+		if sha1hex, sha256hex, size, ok := d.Digest(abs); ok {
+			if done, err := verifyStoredDigest(abs, spec, sha1hex, sha256hex, size); done {
+				return err
+			}
+		}
+	}
 	if spec.SHA256 != "" {
-		got, size, err := FileSHA256(dir, abs)
+		got, size, err := FileSHA256(fsys, abs)
 		if err != nil {
 			return err
 		}
@@ -58,7 +68,7 @@ func VerifyFile(dir *safepath.Dir, abs string, spec Spec) error {
 		}
 		return nil
 	}
-	got, size, err := FileDigest(dir, abs)
+	got, size, err := FileDigest(fsys, abs)
 	if err != nil {
 		return err
 	}
@@ -71,8 +81,39 @@ func VerifyFile(dir *safepath.Dir, abs string, spec Spec) error {
 	return nil
 }
 
-func FileDigest(dir *safepath.Dir, abs string) (sha1hex string, size int64, err error) {
-	f, err := dir.OpenFile(abs)
+// verifyStoredDigest compares spec against backend-stored checksums. done is
+// false when the stored metadata lacks the digest the spec requires, in
+// which case the caller must fall back to streaming verification.
+func verifyStoredDigest(abs string, spec Spec, sha1hex, sha256hex string, size int64) (done bool, err error) {
+	if spec.SHA256 != "" {
+		if sha256hex == "" {
+			return false, nil
+		}
+		if !equalHex(sha256hex, spec.SHA256) {
+			return true, fmt.Errorf("sha256 mismatch for %s: got %s want %s", abs, sha256hex, spec.SHA256)
+		}
+		if spec.Size > 0 && size != spec.Size {
+			return true, fmt.Errorf("size mismatch for %s: got %d want %d", abs, size, spec.Size)
+		}
+		return true, nil
+	}
+	if spec.SHA1 != "" {
+		if sha1hex == "" {
+			return false, nil
+		}
+		if !equalHex(sha1hex, spec.SHA1) {
+			return true, fmt.Errorf("sha1 mismatch for %s: got %s want %s", abs, sha1hex, spec.SHA1)
+		}
+		if spec.Size > 0 && size != spec.Size {
+			return true, fmt.Errorf("size mismatch for %s: got %d want %d", abs, size, spec.Size)
+		}
+		return true, nil
+	}
+	return false, nil
+}
+
+func FileDigest(fsys vfs.FS, abs string) (sha1hex string, size int64, err error) {
+	f, err := fsys.Open(abs)
 	if err != nil {
 		return "", 0, err
 	}

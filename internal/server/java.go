@@ -3,7 +3,6 @@ package server
 import (
 	"context"
 	"net/http"
-	"os"
 	"strings"
 	"sync"
 	"time"
@@ -54,7 +53,7 @@ func (s *Server) cachedJavaIndex() []byte {
 }
 
 func (s *Server) buildJavaIndex() []byte {
-	entries, err := os.ReadDir(s.layout.VersionsDir())
+	entries, err := s.layout.ReadDir(s.layout.VersionsDir())
 	if err != nil {
 		return []byte(`{"versions":[]}`)
 	}

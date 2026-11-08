@@ -3,7 +3,6 @@ package archive
 import (
 	"context"
 	"fmt"
-	"os"
 	"strings"
 
 	"minecraft-version-archive/internal/constants"
@@ -101,7 +100,7 @@ func (a *Archiver) resolveFabricMCVersions(requested []string) ([]string, error)
 	if len(requested) > 0 {
 		return requested, nil
 	}
-	entries, err := os.ReadDir(a.layout.VersionsDir())
+	entries, err := a.layout.ReadDir(a.layout.VersionsDir())
 	if err != nil {
 		return nil, err
 	}
@@ -240,7 +239,7 @@ func (a *Archiver) archiveFabricLibrary(ctx context.Context, lib fabric.Library,
 	dest := a.layout.FabricMavenPath(rel)
 	prog.AddTasks(1)
 	if a.layout.Exists(dest) {
-		prog.TaskDone(fileSize(dest))
+		prog.TaskDone(a.fileSize(dest))
 		return nil
 	}
 	url := fabric.MavenDownloadURL(base, lib.Name)
@@ -252,7 +251,7 @@ func (a *Archiver) archiveFabricLibrary(ctx context.Context, lib fabric.Library,
 		prog.TaskDone(0)
 		return err
 	}
-	prog.TaskDone(fileSize(dest))
+	prog.TaskDone(a.fileSize(dest))
 	return nil
 }
 
@@ -265,7 +264,7 @@ func (a *Archiver) archiveFabricLoaderJSON(ctx context.Context, loaderVersion st
 	dest := a.layout.FabricMavenPath(rel)
 	prog.AddTasks(1)
 	if a.layout.Exists(dest) {
-		prog.TaskDone(fileSize(dest))
+		prog.TaskDone(a.fileSize(dest))
 		return nil
 	}
 	url := fabric.MavenDownloadURL("https://maven.fabricmc.net/", coord)
@@ -273,7 +272,7 @@ func (a *Archiver) archiveFabricLoaderJSON(ctx context.Context, loaderVersion st
 		prog.TaskDone(0)
 		return err
 	}
-	prog.TaskDone(fileSize(dest))
+	prog.TaskDone(a.fileSize(dest))
 	return nil
 }
 

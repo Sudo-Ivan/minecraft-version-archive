@@ -41,3 +41,22 @@ enabled = false
 enabled = false
 peers = http://peer1:8080,http://peer2:8080
 timeout_sec = 30
+
+; S3-compatible object storage backend (AWS S3, MinIO, Cloudflare R2,
+; Backblaze B2, DigitalOcean Spaces, ...). When enabled, archive content,
+; coordinator state, and indexes live in the bucket; data_dir is still used
+; for in-flight .part downloads and upload staging.
+[s3]
+; enabled = false
+; bucket = my-minecraft-archive
+; prefix = minecraft            ; optional key prefix inside the bucket
+; endpoint =                    ; host[:port] or https://... ; empty = AWS S3
+; region =                      ; e.g. us-east-1, auto1 (R2), etc.
+; path_style = false            ; true for MinIO and most S3-compatible stores
+; use_ssl = true                ; ignored when endpoint has an http(s) scheme
+; anonymous = false             ; public buckets: never sign requests
+; access_key =                  ; private buckets: static credentials
+; secret_key =
+; session_token =
+; redirect = false              ; serve files via presigned URL redirects
+; redirect_ttl = 15m            ; presigned URL lifetime

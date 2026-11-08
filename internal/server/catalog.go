@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/url"
-	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -15,6 +14,7 @@ import (
 	"minecraft-version-archive/internal/fabric"
 	"minecraft-version-archive/internal/mojang"
 	"minecraft-version-archive/internal/temurin"
+	"minecraft-version-archive/internal/vfs"
 )
 
 // catalogArtifact is one downloadable file attached to an archived version:
@@ -135,7 +135,7 @@ func (s *Server) cachedCatalog() *catalogSnap {
 }
 
 func (s *Server) buildCatalog() *catalogSnap {
-	entries, err := os.ReadDir(s.layout.VersionsDir())
+	entries, err := s.layout.ReadDir(s.layout.VersionsDir())
 	if err != nil {
 		entries = nil
 	}
@@ -232,7 +232,7 @@ func (s *Server) buildCatalog() *catalogSnap {
 
 // catalogVersionMeta parses one versions/*.json file, cached by path and file
 // signature so catalog rebuilds only re-read files that actually changed.
-func (s *Server) catalogVersionMeta(ent os.DirEntry) *catalogVersionMeta {
+func (s *Server) catalogVersionMeta(ent vfs.DirEntry) *catalogVersionMeta {
 	info, err := ent.Info()
 	if err != nil {
 		return nil

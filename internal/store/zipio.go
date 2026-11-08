@@ -3,8 +3,10 @@ package store
 import (
 	"archive/zip"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"math"
 	"os"
 	"path/filepath"
@@ -13,6 +15,7 @@ import (
 	"minecraft-version-archive/internal/constants"
 	"minecraft-version-archive/internal/mojang"
 	"minecraft-version-archive/internal/safepath"
+	"minecraft-version-archive/internal/vfs"
 )
 
 const (
@@ -56,20 +59,16 @@ type ZipResult struct {
 	Bytes int64
 }
 
-func ExportZip(src, dest string, opts ExportOptions) (ZipResult, error) {
-	src = filepath.Clean(src)
-	info, err := os.Stat(src)
+// ExportZip writes the archive stored under layout to a zip file at dest.
+// Works for both local and object-store backends.
+func ExportZip(layout *Layout, dest string, opts ExportOptions) (ZipResult, error) {
+	src := layout.Root
+	fsys, err := layout.FS()
 	if err != nil {
 		return ZipResult{}, err
 	}
-	if !info.IsDir() {
+	if info, err := fsys.Stat(src); err == nil && !info.IsDir() {
 		return ZipResult{}, fmt.Errorf("export source must be a directory")
-	}
-
-	layout := New(src)
-	srcDir, err := layout.Dir()
-	if err != nil {
-		return ZipResult{}, err
 	}
 
 	var resolved []string
@@ -125,10 +124,10 @@ func ExportZip(src, dest string, opts ExportOptions) (ZipResult, error) {
 
 	if allowPaths != nil {
 		for rel := range allowPaths {
-			abs := filepath.Join(src, filepath.FromSlash(rel))
-			n, err := writeZipFile(srcDir, w, abs, rel)
+			abs := layout.Path(rel)
+			n, err := writeZipFile(fsys, w, abs, rel)
 			if err != nil {
-				if os.IsNotExist(err) {
+				if errors.Is(err, fs.ErrNotExist) || os.IsNotExist(err) {
 					continue
 				}
 				return ZipResult{}, err
@@ -139,8 +138,11 @@ func ExportZip(src, dest string, opts ExportOptions) (ZipResult, error) {
 		return result, nil
 	}
 
-	err = filepath.WalkDir(src, func(path string, d os.DirEntry, walkErr error) error {
+	err = fsys.Walk(src, func(path string, d vfs.DirEntry, walkErr error) error {
 		if walkErr != nil {
+			if errors.Is(walkErr, fs.ErrNotExist) && path == src {
+				return nil // empty backend root
+			}
 			return walkErr
 		}
 		rel, err := filepath.Rel(src, path)
@@ -153,14 +155,14 @@ func ExportZip(src, dest string, opts ExportOptions) (ZipResult, error) {
 		relSlash := filepath.ToSlash(rel)
 		if shouldSkipExport(relSlash) {
 			if d.IsDir() {
-				return filepath.SkipDir
+				return fs.SkipDir
 			}
 			return nil
 		}
 		if d.IsDir() {
 			return nil
 		}
-		n, err := writeZipFile(srcDir, w, path, relSlash)
+		n, err := writeZipFile(fsys, w, path, relSlash)
 		if err != nil {
 			return err
 		}
@@ -174,8 +176,8 @@ func ExportZip(src, dest string, opts ExportOptions) (ZipResult, error) {
 	return result, nil
 }
 
-func writeZipFile(dir *safepath.Dir, w *zip.Writer, path, rel string) (int64, error) {
-	info, err := dir.Stat(path)
+func writeZipFile(fsys vfs.FS, w *zip.Writer, path, rel string) (int64, error) {
+	info, err := fsys.Stat(path)
 	if err != nil {
 		return 0, err
 	}
@@ -189,7 +191,7 @@ func writeZipFile(dir *safepath.Dir, w *zip.Writer, path, rel string) (int64, er
 	if err != nil {
 		return 0, err
 	}
-	in, err := dir.OpenFile(path)
+	in, err := fsys.Open(path)
 	if err != nil {
 		return 0, err
 	}
@@ -211,19 +213,29 @@ func writeZipBytes(w *zip.Writer, name string, data []byte) (int64, error) {
 	return int64(n), err
 }
 
-func ImportZip(dest, zipPath string, replace bool) (ZipResult, error) {
-	dest = filepath.Clean(dest)
-	if replace {
-		if err := os.RemoveAll(dest); err != nil {
-			return ZipResult{}, err
-		}
-	}
-	layout := New(dest)
-	if err := layout.Ensure(); err != nil {
+// ImportZip extracts a previously exported archive into layout's backend.
+// With replace, existing backend content is removed first.
+func ImportZip(layout *Layout, zipPath string, replace bool) (ZipResult, error) {
+	dest := layout.Root
+	fsys, err := layout.FS()
+	if err != nil {
 		return ZipResult{}, err
 	}
-	destDir, err := layout.Dir()
-	if err != nil {
+	if replace {
+		if purger, ok := fsys.(vfs.Purger); ok {
+			if err := purger.RemoveAll(dest); err != nil {
+				return ZipResult{}, err
+			}
+		} else {
+			if err := os.RemoveAll(dest); err != nil {
+				return ZipResult{}, err
+			}
+			if err := fsys.MkdirAll(dest, safepath.DirPerm); err != nil {
+				return ZipResult{}, err
+			}
+		}
+	}
+	if err := layout.Ensure(); err != nil {
 		return ZipResult{}, err
 	}
 
@@ -240,12 +252,12 @@ func ImportZip(dest, zipPath string, replace bool) (ZipResult, error) {
 			return ZipResult{}, err
 		}
 		if file.FileInfo().IsDir() {
-			if err := destDir.MkdirAll(target, safepath.DirPerm); err != nil {
+			if err := fsys.MkdirAll(target, safepath.DirPerm); err != nil {
 				return ZipResult{}, err
 			}
 			continue
 		}
-		if err := destDir.MkdirAll(filepath.Dir(target), safepath.DirPerm); err != nil {
+		if err := fsys.MkdirAll(filepath.Dir(target), safepath.DirPerm); err != nil {
 			return ZipResult{}, err
 		}
 		limit := zipEntryByteLimit(file.Name)
@@ -262,7 +274,7 @@ func ImportZip(dest, zipPath string, replace bool) (ZipResult, error) {
 		if perm&0o077 != 0 {
 			perm = safepath.FilePerm
 		}
-		out, err := destDir.OpenFileFlags(target, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, perm)
+		out, err := fsys.OpenFileFlags(target, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, perm)
 		if err != nil {
 			_ = in.Close()
 			return ZipResult{}, err
@@ -271,11 +283,11 @@ func ImportZip(dest, zipPath string, replace bool) (ZipResult, error) {
 		_ = in.Close()
 		_ = out.Close()
 		if err != nil {
-			_ = os.Remove(target)
+			_ = fsys.Remove(target)
 			return ZipResult{}, err
 		}
 		if declared, ok := zipDeclaredSize(file.UncompressedSize64); ok && n != declared {
-			_ = os.Remove(target)
+			_ = fsys.Remove(target)
 			return ZipResult{}, fmt.Errorf("zip entry %q size mismatch", file.Name)
 		}
 		result.Files++

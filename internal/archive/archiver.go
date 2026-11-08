@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -21,6 +20,7 @@ import (
 	"minecraft-version-archive/internal/p2p"
 	"minecraft-version-archive/internal/stats"
 	"minecraft-version-archive/internal/store"
+	"minecraft-version-archive/internal/vfs"
 )
 
 // ErrInProgress is returned by TryRun when an archive run is already active.
@@ -55,24 +55,32 @@ func NewWithStats(cfg *config.Config, log *slog.Logger, st *stats.Collector) *Ar
 	if cfg.P2PEnabled && len(cfg.Peers) > 0 {
 		peers = p2p.NewRegistry(cfg.Peers, cfg.P2PTimeout, cfg.RetryMax, cfg.RetryBaseMS)
 	}
-	layout := store.New(cfg.DataDir)
+	layout, err := store.NewForConfig(cfg)
+	if err != nil {
+		layout = store.NewFailed(cfg.DataDir, err)
+	}
 	fetchClient := fetch.New(cfg.RetryMax, cfg.RetryBaseMS)
 	if st != nil {
 		fetchClient = fetchClient.WithStats(st)
 	}
-	if dir, err := layout.Dir(); err == nil {
-		fetchClient = fetchClient.WithDataDir(dir)
+	if fsys, err := layout.FS(); err == nil {
+		fetchClient = fetchClient.WithDataDir(fsys)
 	}
 	mojangClient := mojang.NewClientWithFetch(fetchClient)
 	return &Archiver{
 		cfg:    cfg,
-		layout: store.New(cfg.DataDir),
+		layout: layout,
 		mojang: mojangClient,
 		fetch:  fetchClient,
 		peers:  peers,
 		log:    log,
 		stats:  st,
 	}
+}
+
+// Layout returns the storage layout backing this archiver.
+func (a *Archiver) Layout() *store.Layout {
+	return a.layout
 }
 
 // LastRun returns the result of the most recent finished run, or nil when no
@@ -112,6 +120,7 @@ func (a *Archiver) runLocked(ctx context.Context) (err error) {
 		return fmt.Errorf("hash index: %w", err)
 	}
 	a.index = index
+	defer index.Save()
 
 	manifest, err := a.mojang.FetchManifest(ctx)
 	if err != nil {
@@ -124,7 +133,11 @@ func (a *Archiver) runLocked(ctx context.Context) (err error) {
 		return err
 	}
 
-	coord, err := coordinator.New(a.layout.CoordinatorDir(), a.cfg.AgentID, a.cfg.CoordinatorStaleSec)
+	fsys, err := a.layout.FS()
+	if err != nil {
+		return err
+	}
+	coord, err := coordinator.New(fsys, a.layout.CoordinatorDir(), a.cfg.AgentID, a.cfg.CoordinatorStaleSec)
 	if err != nil {
 		return err
 	}
@@ -401,10 +414,10 @@ func (a *Archiver) archiveLibraries(ctx context.Context, v *mojang.Version, prog
 		if a.layout.Exists(dest) {
 			if err := a.verifyFile(dest, spec); err == nil {
 				a.index.Record(spec, dest)
-				prog.TaskDone(fileSize(dest))
+				prog.TaskDone(a.fileSize(dest))
 				continue
 			}
-			_ = os.Remove(dest)
+			_ = a.layout.Remove(dest)
 		}
 		jobs = append(jobs, job{
 			url:  lib.Downloads.Artifact.URL,
@@ -428,10 +441,10 @@ func (a *Archiver) archiveLibraries(ctx context.Context, v *mojang.Version, prog
 			defer func() { <-sem }()
 			if a.tryPeerLibrary(ctx, j.path, j.dest) {
 				if err := a.verifyFile(j.dest, j.spec); err != nil {
-					_ = os.Remove(j.dest)
+					_ = a.layout.Remove(j.dest)
 				} else {
 					a.index.Record(j.spec, j.dest)
-					prog.TaskDone(fileSize(j.dest))
+					prog.TaskDone(a.fileSize(j.dest))
 					return
 				}
 			}
@@ -443,7 +456,7 @@ func (a *Archiver) archiveLibraries(ctx context.Context, v *mojang.Version, prog
 				mu.Unlock()
 				return
 			}
-			prog.TaskDone(fileSize(j.dest))
+			prog.TaskDone(a.fileSize(j.dest))
 			a.index.Record(j.spec, j.dest)
 		})
 	}
@@ -493,15 +506,15 @@ func (a *Archiver) archiveAssets(ctx context.Context, v *mojang.Version, prog *P
 					prog.TaskDone(0)
 					return
 				}
-				_ = os.Remove(dest)
+				_ = a.layout.Remove(dest)
 			}
 			url := constants.MojangAssetBase + "/" + obj.Hash[:2] + "/" + obj.Hash
 			if a.tryPeerAssetObject(ctx, obj.Hash, dest) {
 				if err := a.verifyFile(dest, spec); err != nil {
-					_ = os.Remove(dest)
+					_ = a.layout.Remove(dest)
 				} else {
 					a.index.Record(spec, dest)
-					prog.TaskDone(fileSize(dest))
+					prog.TaskDone(a.fileSize(dest))
 					return
 				}
 			}
@@ -513,7 +526,7 @@ func (a *Archiver) archiveAssets(ctx context.Context, v *mojang.Version, prog *P
 				mu.Unlock()
 				return
 			}
-			prog.TaskDone(fileSize(dest))
+			prog.TaskDone(a.fileSize(dest))
 			a.index.Record(spec, dest)
 		})
 	}
@@ -521,8 +534,8 @@ func (a *Archiver) archiveAssets(ctx context.Context, v *mojang.Version, prog *P
 	return firstErr
 }
 
-func fileSize(path string) int64 {
-	st, err := os.Stat(path)
+func (a *Archiver) fileSize(path string) int64 {
+	st, err := a.layout.Stat(path)
 	if err != nil {
 		return 0
 	}
@@ -530,11 +543,11 @@ func fileSize(path string) int64 {
 }
 
 func (a *Archiver) verifyFile(path string, spec integrity.Spec) error {
-	dir, err := a.layout.Dir()
+	fsys, err := a.layout.FS()
 	if err != nil {
 		return err
 	}
-	return integrity.VerifyFile(dir, path, spec)
+	return integrity.VerifyFile(fsys, path, spec)
 }
 
 func (a *Archiver) tryPeerClient(ctx context.Context, id, dest string) bool {
@@ -620,14 +633,18 @@ func (a *Archiver) BuildInventory() p2p.Inventory {
 	versionsDir := a.layout.VersionsDir()
 	librariesDir := a.layout.LibrariesDir()
 	objectsDir := a.layout.AssetObjectsDir()
-	_ = filepath.Walk(a.layout.Root, func(path string, info os.FileInfo, err error) error {
-		if err != nil || info.IsDir() {
+	_ = a.layout.Walk(a.layout.Root, func(path string, d vfs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return nil
+		}
+		info, err := d.Info()
+		if err != nil {
 			return nil
 		}
 		inv.Bytes += info.Size()
+		name := info.Name()
 		switch dir := filepath.Dir(path); {
-		case dir == versionsDir && filepath.Ext(info.Name()) == ".json":
-			name := info.Name()
+		case dir == versionsDir && filepath.Ext(name) == ".json":
 			inv.Versions = append(inv.Versions, name[:len(name)-5])
 		case strings.HasPrefix(path, librariesDir+string(filepath.Separator)):
 			rel, err := filepath.Rel(librariesDir, path)
@@ -635,7 +652,7 @@ func (a *Archiver) BuildInventory() p2p.Inventory {
 				inv.Libraries = append(inv.Libraries, filepath.ToSlash(rel))
 			}
 		case strings.HasPrefix(path, objectsDir+string(filepath.Separator)):
-			inv.Assets = append(inv.Assets, info.Name())
+			inv.Assets = append(inv.Assets, name)
 		}
 		return nil
 	})

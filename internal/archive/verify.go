@@ -2,7 +2,6 @@ package archive
 
 import (
 	"context"
-	"os"
 
 	"minecraft-version-archive/internal/integrity"
 	"minecraft-version-archive/internal/store"
@@ -13,26 +12,26 @@ func (a *Archiver) ensureArtifact(ctx context.Context, url, dest string, spec in
 		return nil
 	}
 
-	dir, err := a.layout.Dir()
+	fsys, err := a.layout.FS()
 	if err != nil {
 		return err
 	}
 
 	if a.layout.Exists(dest) {
-		if err := integrity.VerifyFile(dir, dest, spec); err == nil {
+		if err := integrity.VerifyFile(fsys, dest, spec); err == nil {
 			a.index.Record(spec, dest)
-			prog.TaskDone(fileSize(dest))
+			prog.TaskDone(a.fileSize(dest))
 			return nil
 		}
-		_ = os.Remove(dest)
+		_ = a.layout.Remove(dest)
 	}
 
 	if peerFn != nil && peerFn() {
-		if err := integrity.VerifyFile(dir, dest, spec); err != nil {
-			_ = os.Remove(dest)
+		if err := integrity.VerifyFile(fsys, dest, spec); err != nil {
+			_ = a.layout.Remove(dest)
 		} else {
 			a.index.Record(spec, dest)
-			prog.TaskDone(fileSize(dest))
+			prog.TaskDone(a.fileSize(dest))
 			return nil
 		}
 	}
@@ -41,7 +40,7 @@ func (a *Archiver) ensureArtifact(ctx context.Context, url, dest string, spec in
 		return err
 	}
 	a.index.Record(spec, dest)
-	prog.TaskDone(fileSize(dest))
+	prog.TaskDone(a.fileSize(dest))
 	return nil
 }
 
@@ -56,15 +55,15 @@ func (a *Archiver) resolveFromIndex(dest string, spec integrity.Spec, prog *Prog
 	if err := store.LinkOrCopy(a.layout, src, dest); err != nil {
 		return false
 	}
-	dir, err := a.layout.Dir()
+	fsys, err := a.layout.FS()
 	if err != nil {
 		return false
 	}
-	if err := integrity.VerifyFile(dir, dest, spec); err != nil {
-		_ = os.Remove(dest)
+	if err := integrity.VerifyFile(fsys, dest, spec); err != nil {
+		_ = a.layout.Remove(dest)
 		return false
 	}
 	a.index.Record(spec, dest)
-	prog.TaskDone(fileSize(dest))
+	prog.TaskDone(a.fileSize(dest))
 	return true
 }

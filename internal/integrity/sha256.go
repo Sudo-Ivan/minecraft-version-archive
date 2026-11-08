@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"io"
 
-	"minecraft-version-archive/internal/safepath"
+	"minecraft-version-archive/internal/vfs"
 )
 
 func verifySHA256Bytes(data []byte, want string) error {
@@ -18,8 +18,8 @@ func verifySHA256Bytes(data []byte, want string) error {
 	return nil
 }
 
-func FileSHA256(dir *safepath.Dir, abs string) (sha256hex string, size int64, err error) {
-	f, err := dir.OpenFile(abs)
+func FileSHA256(fsys vfs.FS, abs string) (sha256hex string, size int64, err error) {
+	f, err := fsys.Open(abs)
 	if err != nil {
 		return "", 0, err
 	}

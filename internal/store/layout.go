@@ -3,6 +3,7 @@ package store
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -10,50 +11,177 @@ import (
 	"sync"
 	"time"
 
+	"minecraft-version-archive/internal/config"
 	"minecraft-version-archive/internal/constants"
 	"minecraft-version-archive/internal/safepath"
+	"minecraft-version-archive/internal/vfs"
 )
 
 type Layout struct {
 	Root string
-	dir  *safepath.Dir
+	fsys vfs.FS
 	once sync.Once
 	err  error
+}
+
+// S3Options configures an S3-compatible object storage backend.
+type S3Options struct {
+	Bucket       string
+	Prefix       string
+	Endpoint     string // host[:port] or URL; empty means AWS S3
+	Region       string
+	AccessKey    string
+	SecretKey    string
+	SessionToken string
+	Anonymous    bool // never sign requests (public buckets)
+	PathStyle    bool // path-style URLs (bucket in path)
+	Secure       bool // use HTTPS when Endpoint carries no scheme
+	SecureAuto   bool // derive Secure from endpoint scheme / localhost
+	Redirect     bool // serve files via presigned redirects
+	RedirectTTL  time.Duration
 }
 
 func New(root string) *Layout {
 	return &Layout{Root: filepath.Clean(root)}
 }
 
-func (l *Layout) Dir() (*safepath.Dir, error) {
-	l.once.Do(func() {
-		l.dir, l.err = safepath.OpenDir(l.Root)
+func NewS3(root string, opts S3Options) (*Layout, error) {
+	fsys, err := newS3FS(root, opts)
+	if err != nil {
+		return nil, err
+	}
+	l := New(root)
+	l.fsys = fsys
+	return l, nil
+}
+
+// NewFailed returns a Layout whose backend always fails with err. Used when
+// backend construction fails so callers surface the error instead of
+// silently falling back to the local disk.
+func NewFailed(root string, err error) *Layout {
+	l := New(root)
+	l.fsys = failedFS{err: err}
+	return l
+}
+
+func NewForConfig(cfg *config.Config) (*Layout, error) {
+	if !cfg.S3.Enabled {
+		return New(cfg.DataDir), nil
+	}
+	return NewS3(cfg.DataDir, S3Options{
+		Bucket:       cfg.S3.Bucket,
+		Prefix:       cfg.S3.Prefix,
+		Endpoint:     cfg.S3.Endpoint,
+		Region:       cfg.S3.Region,
+		AccessKey:    cfg.S3.AccessKey,
+		SecretKey:    cfg.S3.SecretKey,
+		SessionToken: cfg.S3.SessionToken,
+		Anonymous:    cfg.S3.Anonymous,
+		PathStyle:    cfg.S3.PathStyle,
+		Secure:       cfg.S3.Secure,
+		SecureAuto:   cfg.S3.SecureAuto,
+		Redirect:     cfg.S3.Redirect,
+		RedirectTTL:  cfg.S3.RedirectTTL,
 	})
-	return l.dir, l.err
+}
+
+func (l *Layout) FS() (vfs.FS, error) {
+	l.once.Do(func() {
+		if l.fsys == nil {
+			l.fsys, l.err = safepath.OpenDir(l.Root)
+		}
+	})
+	if l.err != nil {
+		return nil, l.err
+	}
+	return l.fsys, nil
+}
+
+type failedFS struct{ err error }
+
+func (f failedFS) ReadFile(string) ([]byte, error) { return nil, f.err }
+func (f failedFS) Open(string) (vfs.File, error)   { return nil, f.err }
+func (f failedFS) Create(string) (vfs.File, error) { return nil, f.err }
+func (f failedFS) OpenFileFlags(string, int, fs.FileMode) (vfs.File, error) {
+	return nil, f.err
+}
+func (f failedFS) WriteFile(string, []byte, fs.FileMode) error { return f.err }
+func (f failedFS) WriteFileExclusive(string, []byte, fs.FileMode) error {
+	return f.err
+}
+func (f failedFS) MkdirAll(string, fs.FileMode) error     { return f.err }
+func (f failedFS) Stat(string) (fs.FileInfo, error)       { return nil, f.err }
+func (f failedFS) Exists(string) bool                     { return false }
+func (f failedFS) Remove(string) error                    { return f.err }
+func (f failedFS) Rename(string, string) error            { return f.err }
+func (f failedFS) ReadDir(string) ([]vfs.DirEntry, error) { return nil, f.err }
+func (f failedFS) Walk(string, vfs.WalkFunc) error        { return f.err }
+func (f failedFS) CopyFromReader(string, io.Reader, int64) (int64, error) {
+	return 0, f.err
 }
 
 func (l *Layout) ReadFile(abs string) ([]byte, error) {
-	d, err := l.Dir()
+	fsys, err := l.FS()
 	if err != nil {
 		return nil, err
 	}
-	return d.ReadFile(abs)
+	return fsys.ReadFile(abs)
 }
 
-func (l *Layout) OpenFile(abs string) (*os.File, error) {
-	d, err := l.Dir()
+func (l *Layout) OpenFile(abs string) (vfs.File, error) {
+	fsys, err := l.FS()
 	if err != nil {
 		return nil, err
 	}
-	return d.OpenFile(abs)
+	return fsys.Open(abs)
 }
 
 func (l *Layout) Stat(abs string) (fs.FileInfo, error) {
-	d, err := l.Dir()
+	fsys, err := l.FS()
 	if err != nil {
 		return nil, err
 	}
-	return d.Stat(abs)
+	return fsys.Stat(abs)
+}
+
+func (l *Layout) ReadDir(abs string) ([]vfs.DirEntry, error) {
+	fsys, err := l.FS()
+	if err != nil {
+		return nil, err
+	}
+	return fsys.ReadDir(abs)
+}
+
+func (l *Layout) Walk(root string, fn vfs.WalkFunc) error {
+	fsys, err := l.FS()
+	if err != nil {
+		return err
+	}
+	return fsys.Walk(root, fn)
+}
+
+func (l *Layout) Remove(abs string) error {
+	fsys, err := l.FS()
+	if err != nil {
+		return err
+	}
+	return fsys.Remove(abs)
+}
+
+func (l *Layout) Rename(src, dst string) error {
+	fsys, err := l.FS()
+	if err != nil {
+		return err
+	}
+	return fsys.Rename(src, dst)
+}
+
+func (l *Layout) MkdirAll(abs string, perm fs.FileMode) error {
+	fsys, err := l.FS()
+	if err != nil {
+		return err
+	}
+	return fsys.MkdirAll(abs, perm)
 }
 
 func (l *Layout) Ensure() error {
@@ -72,12 +200,12 @@ func (l *Layout) Ensure() error {
 		l.FabricMavenDir(),
 		l.JavaTemurinDir(),
 	}
-	dir, err := l.Dir()
+	fsys, err := l.FS()
 	if err != nil {
 		return err
 	}
 	for _, d := range dirs {
-		if err := dir.MkdirAll(d, safepath.DirPerm); err != nil {
+		if err := fsys.MkdirAll(d, safepath.DirPerm); err != nil {
 			return err
 		}
 	}
@@ -176,11 +304,38 @@ func (l *Layout) AssetObjectPath(hash string) string {
 }
 
 func (l *Layout) Exists(path string) bool {
-	d, err := l.Dir()
+	fsys, err := l.FS()
 	if err != nil {
 		return false
 	}
-	return d.Exists(path)
+	return fsys.Exists(path)
+}
+
+// Path resolves a root-relative slash path to the backend path used by FS
+// operations (absolute for local backends, still absolute-looking for object
+// backends since keys are derived from it).
+func (l *Layout) Path(rel string) string {
+	return filepath.Join(l.Root, filepath.FromSlash(rel))
+}
+
+// RelPath converts an absolute or already-relative path to a canonical
+// slash-separated path relative to Root. ok is false for paths outside Root.
+func (l *Layout) RelPath(p string) (string, bool) {
+	p = filepath.Clean(p)
+	var rel string
+	if filepath.IsAbs(p) {
+		r, err := filepath.Rel(l.Root, p)
+		if err != nil {
+			return "", false
+		}
+		rel = r
+	} else {
+		rel = p
+	}
+	if rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
+		return "", false
+	}
+	return filepath.ToSlash(rel), true
 }
 
 func WriteJSON(layout *Layout, path string, v any) error {
@@ -193,11 +348,11 @@ func WriteJSON(layout *Layout, path string, v any) error {
 }
 
 func WriteBytes(layout *Layout, path string, data []byte) error {
-	d, err := layout.Dir()
+	fsys, err := layout.FS()
 	if err != nil {
 		return err
 	}
-	return d.WriteFile(path, data, safepath.FilePerm)
+	return fsys.WriteFile(path, data, safepath.FilePerm)
 }
 
 func WriteJSONPath(path string, v any) error {

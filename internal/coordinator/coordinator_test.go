@@ -9,11 +9,11 @@ import (
 
 func TestClaimNextNoOverlap(t *testing.T) {
 	dir := t.TempDir()
-	a, err := New(dir, "agent-a", 3600)
+	a, err := NewDir(dir, "agent-a", 3600)
 	if err != nil {
 		t.Fatal(err)
 	}
-	b, err := New(dir, "agent-b", 3600)
+	b, err := NewDir(dir, "agent-b", 3600)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,7 +86,7 @@ func allDone(versions []string, c *Coordinator) bool {
 
 func TestStaleClaimRecovery(t *testing.T) {
 	dir := t.TempDir()
-	c, err := New(dir, "agent-a", 1)
+	c, err := NewDir(dir, "agent-a", 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -98,7 +98,7 @@ func TestStaleClaimRecovery(t *testing.T) {
 		t.Fatalf("id = %q", id)
 	}
 	time.Sleep(1100 * time.Millisecond)
-	b, err := New(dir, "agent-b", 1)
+	b, err := NewDir(dir, "agent-b", 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -111,7 +111,7 @@ func TestStaleClaimRecovery(t *testing.T) {
 
 func TestPendingSkipsDone(t *testing.T) {
 	dir := t.TempDir()
-	c, err := New(dir, "agent", 3600)
+	c, err := NewDir(dir, "agent", 3600)
 	if err != nil {
 		t.Fatal(err)
 	}

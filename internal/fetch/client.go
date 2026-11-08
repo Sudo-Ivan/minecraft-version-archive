@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"io/fs"
 	"net/http"
 	"os"
 	"sync"
@@ -14,6 +15,7 @@ import (
 	"minecraft-version-archive/internal/integrity"
 	"minecraft-version-archive/internal/safepath"
 	"minecraft-version-archive/internal/stats"
+	"minecraft-version-archive/internal/vfs"
 )
 
 type fileLock struct {
@@ -29,7 +31,7 @@ type Client struct {
 	locksMu sync.Mutex
 	locks   map[string]*fileLock
 	stats   *stats.Collector
-	data    *safepath.Dir
+	data    vfs.FS
 }
 
 func New(retryMax, baseMS int) *Client {
@@ -55,7 +57,7 @@ func NewWithHTTP(httpClient *http.Client, retryMax, baseMS int) *Client {
 	}
 }
 
-func (c *Client) WithDataDir(dir *safepath.Dir) *Client {
+func (c *Client) WithDataDir(dir vfs.FS) *Client {
 	c.data = dir
 	return c
 }
@@ -239,7 +241,7 @@ func (c *Client) downloadLocked(ctx context.Context, url, dest string) error {
 		case http.StatusRequestedRangeNotSatisfiable:
 			_ = resp.Body.Close()
 			offset = 0
-			_ = os.Remove(tmp)
+			c.removePath(tmp)
 			req.Header.Del("Range")
 			continue
 		default:
@@ -282,13 +284,13 @@ func (c *Client) DownloadVerified(ctx context.Context, url, dest string, spec in
 
 	var last error
 	for attempt := 0; attempt < c.retry; attempt++ {
-		_ = os.Remove(dest)
+		c.removePath(dest)
 		if err := c.downloadLocked(ctx, url, dest); err != nil {
 			last = err
 			continue
 		}
 		if err := integrity.VerifyFile(c.data, dest, spec); err != nil {
-			_ = os.Remove(dest)
+			c.removePath(dest)
 			last = fmt.Errorf("integrity: %w", err)
 			if attempt > 0 {
 				delay := time.Duration(c.baseMS*(1<<uint(attempt-1))) * time.Millisecond
@@ -311,7 +313,7 @@ func (c *Client) writeBody(r io.Reader, path string, offset int64, truncate bool
 	if c.data == nil {
 		return fmt.Errorf("download requires data directory")
 	}
-	var f *os.File
+	var f vfs.File
 	var err error
 	if truncate || offset == 0 {
 		f, err = c.data.Create(path)
@@ -329,14 +331,25 @@ func (c *Client) writeBody(r io.Reader, path string, offset int64, truncate bool
 	return err
 }
 
-func (c *Client) statPath(path string) (os.FileInfo, error) {
+func (c *Client) statPath(path string) (fs.FileInfo, error) {
 	if c.data != nil {
 		return c.data.Stat(path)
 	}
 	return os.Stat(path)
 }
 
+func (c *Client) removePath(path string) {
+	if c.data != nil {
+		_ = c.data.Remove(path)
+		return
+	}
+	_ = os.Remove(path)
+}
+
 func (c *Client) renameTmp(tmp, dest string) error {
+	if c.data != nil {
+		return c.data.Rename(tmp, dest)
+	}
 	return os.Rename(tmp, dest)
 }
 

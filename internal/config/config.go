@@ -48,6 +48,7 @@ type Config struct {
 	P2PEnabled          bool
 	Peers               []string
 	P2PTimeout          int
+	S3                  S3Config
 }
 
 func Load(path string) (*Config, error) {
@@ -99,6 +100,7 @@ func Load(path string) (*Config, error) {
 		BlockScanners:       getBool(ini, constants.INISectionServer, "block_scanners", true),
 		P2PEnabled:          getBool(ini, constants.INISectionP2P, "enabled", false),
 		P2PTimeout:          getInt(ini, constants.INISectionP2P, "timeout_sec", constants.DefaultP2PTimeout),
+		S3:                  loadS3(ini),
 	}
 
 	cacheBytes, err := resolveCacheBytes(ini)
@@ -115,9 +117,13 @@ func Load(path string) (*Config, error) {
 	}
 
 	applyEnv(cfg)
+	applyS3Env(&cfg.S3)
 	applyDerivedDefaults(cfg)
 	if cfg.AgentID == "" {
 		cfg.AgentID = coordinatorAgentID()
+	}
+	if err := cfg.S3.validate(); err != nil {
+		return nil, err
 	}
 	if err := cfg.validate(); err != nil {
 		return nil, err

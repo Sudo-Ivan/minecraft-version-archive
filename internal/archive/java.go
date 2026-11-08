@@ -3,7 +3,6 @@ package archive
 import (
 	"context"
 	"fmt"
-	"os"
 	"sort"
 	"strings"
 
@@ -64,7 +63,7 @@ func (a *Archiver) resolveJavaMajors(requested []int) ([]int, error) {
 		sort.Ints(out)
 		return dedupeSortedInts(out), nil
 	}
-	entries, err := os.ReadDir(a.layout.VersionsDir())
+	entries, err := a.layout.ReadDir(a.layout.VersionsDir())
 	if err != nil {
 		return nil, err
 	}
@@ -141,13 +140,13 @@ func (a *Archiver) archiveJavaMajor(ctx context.Context, major int, platforms []
 }
 
 func (a *Archiver) ensureJavaBinary(ctx context.Context, url, dest string, spec integrity.Spec) error {
-	dir, err := a.layout.Dir()
+	fsys, err := a.layout.FS()
 	if err != nil {
 		return err
 	}
-	if err := integrity.VerifyFile(dir, dest, spec); err == nil {
+	if err := integrity.VerifyFile(fsys, dest, spec); err == nil {
 		return nil
 	}
-	_ = os.Remove(dest)
+	_ = a.layout.Remove(dest)
 	return a.fetch.DownloadVerified(ctx, url, dest, spec)
 }

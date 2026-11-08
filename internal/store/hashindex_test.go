@@ -43,7 +43,7 @@ func TestHashIndexRecordAndLookup(t *testing.T) {
 	if err := LinkOrCopy(layout, found, other); err != nil {
 		t.Fatal(err)
 	}
-	dataDir, err := layout.Dir()
+	dataDir, err := layout.FS()
 	if err != nil {
 		t.Fatal(err)
 	}

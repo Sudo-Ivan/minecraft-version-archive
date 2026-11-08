@@ -124,6 +124,7 @@ const (
 	INISectionServer  = "server"
 	INISectionStats   = "stats"
 	INISectionP2P     = "p2p"
+	INISectionS3      = "s3"
 )
 
 var (

@@ -2,7 +2,9 @@ package coordinator
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -10,6 +12,7 @@ import (
 	"time"
 
 	"minecraft-version-archive/internal/safepath"
+	"minecraft-version-archive/internal/vfs"
 )
 
 type Claim struct {
@@ -19,16 +22,27 @@ type Claim struct {
 	PID     int    `json:"pid"`
 }
 
+// doneCacheTTL bounds how stale the done-marker view can be. Other agents'
+// completions become visible after at most this delay.
+const doneCacheTTL = 2 * time.Second
+
 type Coordinator struct {
-	dir       *safepath.Dir
+	fs        vfs.FS
 	claimsDir string
 	doneDir   string
 	agent     string
 	staleSec  int
 	mu        sync.Mutex
+
+	doneMu    sync.RWMutex
+	doneCache map[string]bool
+	doneAt    time.Time
 }
 
-func New(root, agent string, staleSec int) (*Coordinator, error) {
+// New creates a Coordinator over fs. fs must be rooted at an ancestor of
+// root (typically the layout root); root is the coordinator directory that
+// holds claims/ and done/.
+func New(fsys vfs.FS, root, agent string, staleSec int) (*Coordinator, error) {
 	if agent == "" {
 		agent = defaultAgent()
 	}
@@ -36,20 +50,16 @@ func New(root, agent string, staleSec int) (*Coordinator, error) {
 		staleSec = 3600
 	}
 	root = filepath.Clean(root)
-	dir, err := safepath.OpenDir(root)
-	if err != nil {
-		return nil, err
-	}
 	claimsDir := filepath.Join(root, "claims")
 	doneDir := filepath.Join(root, "done")
-	if err := dir.MkdirAll(claimsDir, safepath.DirPerm); err != nil {
+	if err := fsys.MkdirAll(claimsDir, safepath.DirPerm); err != nil {
 		return nil, err
 	}
-	if err := dir.MkdirAll(doneDir, safepath.DirPerm); err != nil {
+	if err := fsys.MkdirAll(doneDir, safepath.DirPerm); err != nil {
 		return nil, err
 	}
 	return &Coordinator{
-		dir:       dir,
+		fs:        fsys,
 		claimsDir: claimsDir,
 		doneDir:   doneDir,
 		agent:     agent,
@@ -57,12 +67,66 @@ func New(root, agent string, staleSec int) (*Coordinator, error) {
 	}, nil
 }
 
+// NewDir is a convenience constructor for a purely local coordinator root.
+func NewDir(root, agent string, staleSec int) (*Coordinator, error) {
+	fsys, err := safepath.OpenDir(root)
+	if err != nil {
+		return nil, err
+	}
+	return New(fsys, root, agent, staleSec)
+}
+
 func (c *Coordinator) IsDone(version string) bool {
-	return c.dir.Exists(c.donePath(version))
+	c.doneMu.RLock()
+	fresh := c.doneCache != nil && time.Since(c.doneAt) < doneCacheTTL
+	if fresh {
+		done := c.doneCache[safeName(version)]
+		c.doneMu.RUnlock()
+		return done
+	}
+	c.doneMu.RUnlock()
+	set, err := c.doneSet()
+	if err != nil {
+		return false
+	}
+	name := safeName(version)
+	c.doneMu.Lock()
+	c.doneCache = set
+	c.doneAt = time.Now()
+	c.doneMu.Unlock()
+	_, done := set[name]
+	return done
+}
+
+// doneSet lists the done directory once; on object stores this is a single
+// prefix listing instead of one stat per version.
+func (c *Coordinator) doneSet() (map[string]bool, error) {
+	entries, err := c.fs.ReadDir(c.doneDir)
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return map[string]bool{}, nil
+		}
+		return nil, err
+	}
+	set := make(map[string]bool, len(entries))
+	for _, e := range entries {
+		if !e.IsDir() {
+			set[e.Name()] = true
+		}
+	}
+	return set, nil
 }
 
 func (c *Coordinator) MarkDone(version string) error {
-	return c.dir.WriteFile(c.donePath(version), []byte("ok\n"), safepath.FilePerm)
+	if err := c.fs.WriteFile(c.donePath(version), []byte("ok\n"), safepath.FilePerm); err != nil {
+		return err
+	}
+	c.doneMu.Lock()
+	if c.doneCache != nil {
+		c.doneCache[safeName(version)] = true
+	}
+	c.doneMu.Unlock()
+	return nil
 }
 
 func (c *Coordinator) ClaimNext(versions []string) (string, bool) {
@@ -81,12 +145,15 @@ func (c *Coordinator) ClaimNext(versions []string) (string, bool) {
 }
 
 func (c *Coordinator) Release(version string) {
-	_ = os.Remove(c.claimPath(version))
+	_ = c.fs.Remove(c.claimPath(version))
 }
 
 func (c *Coordinator) ActiveClaims() ([]Claim, error) {
-	entries, err := os.ReadDir(c.claimsDir)
+	entries, err := c.fs.ReadDir(c.claimsDir)
 	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return nil, nil
+		}
 		return nil, err
 	}
 	var out []Claim
@@ -95,7 +162,7 @@ func (c *Coordinator) ActiveClaims() ([]Claim, error) {
 			continue
 		}
 		path := filepath.Join(c.claimsDir, e.Name())
-		data, err := c.dir.ReadFile(path)
+		data, err := c.fs.ReadFile(path)
 		if err != nil {
 			continue
 		}
@@ -122,12 +189,6 @@ func (c *Coordinator) tryClaim(version string) bool {
 }
 
 func (c *Coordinator) writeClaim(path, version string) error {
-	f, err := c.dir.OpenFileFlags(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, safepath.FilePerm)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = f.Close() }()
-
 	cl := Claim{
 		Agent:   c.agent,
 		Version: version,
@@ -135,14 +196,13 @@ func (c *Coordinator) writeClaim(path, version string) error {
 		PID:     os.Getpid(),
 	}
 	data, _ := json.Marshal(cl)
-	_, err = f.Write(append(data, '\n'))
-	return err
+	return c.fs.WriteFileExclusive(path, append(data, '\n'), safepath.FilePerm)
 }
 
 func (c *Coordinator) clearStale(path string) error {
-	data, err := c.dir.ReadFile(path)
+	data, err := c.fs.ReadFile(path)
 	if err != nil {
-		if os.IsNotExist(err) {
+		if errors.Is(err, fs.ErrNotExist) || errors.Is(err, os.ErrNotExist) {
 			return nil
 		}
 		return err
@@ -152,7 +212,7 @@ func (c *Coordinator) clearStale(path string) error {
 		return nil
 	}
 	if time.Now().Unix()-cl.Started >= int64(c.staleSec) {
-		_ = os.Remove(path)
+		_ = c.fs.Remove(path)
 	}
 	return nil
 }

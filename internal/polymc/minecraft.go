@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"os"
 	"sort"
 	"strings"
 
@@ -67,7 +66,7 @@ func lwjglRequires(version string) []Require {
 
 // mcVersionIDs lists archived Minecraft version ids.
 func mcVersionIDs(layout *store.Layout) ([]string, error) {
-	entries, err := os.ReadDir(layout.VersionsDir())
+	entries, err := layout.ReadDir(layout.VersionsDir())
 	if err != nil {
 		return nil, err
 	}

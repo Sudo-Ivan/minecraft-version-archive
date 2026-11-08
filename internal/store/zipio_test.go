@@ -12,8 +12,9 @@ import (
 )
 
 func TestExportImportZip(t *testing.T) {
-	src := t.TempDir()
-	layout := New(src)
+	srcDir := t.TempDir()
+	src := New(srcDir)
+	layout := New(srcDir)
 	if err := layout.Ensure(); err != nil {
 		t.Fatal(err)
 	}
@@ -58,7 +59,8 @@ func TestExportImportZip(t *testing.T) {
 		t.Fatal("claims should be excluded from export")
 	}
 
-	dest := t.TempDir()
+	destDir := t.TempDir()
+	dest := New(destDir)
 	imported, err := ImportZip(dest, zipPath, false)
 	if err != nil {
 		t.Fatal(err)
@@ -66,7 +68,7 @@ func TestExportImportZip(t *testing.T) {
 	if imported.Files != 2 {
 		t.Fatalf("imported files = %d", imported.Files)
 	}
-	got, err := os.ReadFile(filepath.Join(dest, "versions", "1.0.json"))
+	got, err := os.ReadFile(filepath.Join(destDir, "versions", "1.0.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -92,15 +94,17 @@ func TestImportZipRejectsTraversal(t *testing.T) {
 	w.Close()
 	f.Close()
 
-	dest := t.TempDir()
+	destDir := t.TempDir()
+	dest := New(destDir)
 	if _, err := ImportZip(dest, zipPath, false); err == nil {
 		t.Fatal("expected zip slip error")
 	}
 }
 
 func TestImportZipReplace(t *testing.T) {
-	src := t.TempDir()
-	layout := New(src)
+	srcDir := t.TempDir()
+	src := New(srcDir)
+	layout := New(srcDir)
 	if err := layout.Ensure(); err != nil {
 		t.Fatal(err)
 	}
@@ -113,9 +117,10 @@ func TestImportZipReplace(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	dest := t.TempDir()
-	other := filepath.Join(dest, "extra.txt")
-	if err := os.MkdirAll(dest, 0o755); err != nil {
+	destDir := t.TempDir()
+	dest := New(destDir)
+	other := filepath.Join(destDir, "extra.txt")
+	if err := os.MkdirAll(destDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(other, []byte("keep"), 0o644); err != nil {
@@ -127,7 +132,7 @@ func TestImportZipReplace(t *testing.T) {
 	if _, err := os.Stat(other); err == nil {
 		t.Fatal("replace should remove files outside archive")
 	}
-	if _, err := os.Stat(filepath.Join(dest, "versions", "old.json")); err != nil {
+	if _, err := os.Stat(filepath.Join(destDir, "versions", "old.json")); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -188,7 +193,8 @@ func TestImportZipAllowsLargeMinecraftPaths(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	dest := t.TempDir()
+	destDir := t.TempDir()
+	dest := New(destDir)
 	result, err := ImportZip(dest, zipPath, false)
 	if err != nil {
 		t.Fatal(err)
@@ -204,7 +210,7 @@ func TestImportZipAllowsLargeMinecraftPaths(t *testing.T) {
 		filepath.Join(constants.DirJars, constants.DirServer, "1.21.1.jar"),
 		filepath.Join(constants.DirLibraries, "com/example/runtime/jvm.dll"),
 	} {
-		info, err := os.Stat(filepath.Join(dest, rel))
+		info, err := os.Stat(filepath.Join(destDir, rel))
 		if err != nil {
 			t.Fatalf("stat %s: %v", rel, err)
 		}
@@ -238,7 +244,8 @@ func TestImportZipRejectsOversizedMiscEntry(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	dest := t.TempDir()
+	destDir := t.TempDir()
+	dest := New(destDir)
 	if _, err := ImportZip(dest, zipPath, false); err == nil {
 		t.Fatal("expected oversize misc entry to be rejected")
 	}

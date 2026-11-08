@@ -40,7 +40,7 @@ type proxyHelper struct {
 func newProxyHelper(layout *store.Layout, retryMax, retryMS int, proxyCache bool, log *slog.Logger) *proxyHelper {
 	client := fetch.New(retryMax, retryMS)
 	hasDataDir := false
-	if d, err := layout.Dir(); err == nil {
+	if d, err := layout.FS(); err == nil {
 		client = client.WithDataDir(d)
 		hasDataDir = true
 	}

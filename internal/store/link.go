@@ -6,26 +6,37 @@ import (
 	"path/filepath"
 
 	"minecraft-version-archive/internal/safepath"
+	"minecraft-version-archive/internal/vfs"
 )
 
 func LinkOrCopy(layout *Layout, src, dest string) error {
 	if samePath(src, dest) {
 		return nil
 	}
-	dir, err := layout.Dir()
+	fsys, err := layout.FS()
 	if err != nil {
 		return err
 	}
-	if err := dir.MkdirAll(filepath.Dir(dest), safepath.DirPerm); err != nil {
+	if err := fsys.MkdirAll(filepath.Dir(dest), safepath.DirPerm); err != nil {
 		return err
 	}
-	if err := os.Remove(dest); err != nil && !os.IsNotExist(err) {
-		return err
+	_ = fsys.Remove(dest)
+
+	// Backends with a native copy (e.g. S3 CopyObject) dedupe server-side.
+	if copier, ok := fsys.(vfs.Copier); ok {
+		if err := copier.Copy(src, dest); err == nil {
+			return nil
+		}
 	}
-	if err := os.Link(src, dest); err == nil {
-		return nil
+
+	// Hard links only exist on local filesystems; remote backends dedupe via
+	// Copier above or stream a copy below.
+	if remote, ok := fsys.(vfs.RemoteFS); !ok || !remote.IsRemote() {
+		if err := os.Link(src, dest); err == nil {
+			return nil
+		}
 	}
-	return copyFile(src, dest, dir)
+	return copyFile(fsys, src, dest)
 }
 
 func samePath(a, b string) bool {
@@ -37,14 +48,14 @@ func samePath(a, b string) bool {
 	return aa == bb
 }
 
-func copyFile(src, dest string, dir *safepath.Dir) error {
-	in, err := dir.OpenFile(src)
+func copyFile(fsys vfs.FS, src, dest string) error {
+	in, err := fsys.Open(src)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = in.Close() }()
 
-	out, err := dir.OpenFileFlags(dest, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, safepath.FilePerm)
+	out, err := fsys.OpenFileFlags(dest, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, safepath.FilePerm)
 	if err != nil {
 		return err
 	}

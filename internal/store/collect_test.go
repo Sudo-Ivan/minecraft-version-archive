@@ -8,8 +8,9 @@ import (
 )
 
 func TestExportPartialVersions(t *testing.T) {
-	src := t.TempDir()
-	layout := New(src)
+	srcDir := t.TempDir()
+	src := New(srcDir)
+	layout := New(srcDir)
 	if err := layout.Ensure(); err != nil {
 		t.Fatal(err)
 	}
@@ -65,8 +66,8 @@ func TestExportPartialVersions(t *testing.T) {
 }
 
 func TestCollectExportPaths(t *testing.T) {
-	src := t.TempDir()
-	layout := New(src)
+	srcDir := t.TempDir()
+	layout := New(srcDir)
 	if err := layout.Ensure(); err != nil {
 		t.Fatal(err)
 	}

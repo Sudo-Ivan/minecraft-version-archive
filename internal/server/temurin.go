@@ -77,7 +77,7 @@ func (s *Server) handleJavaTemurinBinary(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	path := temurin.PlatformFilePath(s.layout, major, platform, file)
-	dataDir, err := s.layout.Dir()
+	dataDir, err := s.layout.FS()
 	if err != nil {
 		http.NotFound(w, r)
 		return

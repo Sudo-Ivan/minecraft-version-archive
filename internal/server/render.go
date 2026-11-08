@@ -8,7 +8,7 @@ import (
 
 	"minecraft-version-archive/internal/constants"
 	"minecraft-version-archive/internal/integrity"
-	"minecraft-version-archive/internal/safepath"
+	"minecraft-version-archive/internal/vfs"
 )
 
 type renderEntry struct {
@@ -65,8 +65,8 @@ func (s *Server) renderFile(path, publicURL string, render func([]byte) ([]byte,
 
 // verifyFresh verifies path against spec, skipping the hash when the file's
 // size and mtime match a previously verified read.
-func (s *Server) verifyFresh(d *safepath.Dir, path string, spec integrity.Spec) error {
-	info, err := d.Stat(path)
+func (s *Server) verifyFresh(fsys vfs.FS, path string, spec integrity.Spec) error {
+	info, err := fsys.Stat(path)
 	if err != nil {
 		return err
 	}
@@ -77,7 +77,7 @@ func (s *Server) verifyFresh(d *safepath.Dir, path string, spec integrity.Spec) 
 	if ok && cached == sig {
 		return nil
 	}
-	if err := integrity.VerifyFile(d, path, spec); err != nil {
+	if err := integrity.VerifyFile(fsys, path, spec); err != nil {
 		s.verifyMu.Lock()
 		delete(s.verified, path)
 		s.verifyMu.Unlock()
@@ -96,8 +96,8 @@ func (s *Server) noteVerified(path string, sig fileSig) {
 	s.verifyMu.Unlock()
 }
 
-func (s *Server) noteVerifiedFile(d *safepath.Dir, path string) {
-	info, err := d.Stat(path)
+func (s *Server) noteVerifiedFile(fsys vfs.FS, path string) {
+	info, err := fsys.Stat(path)
 	if err != nil {
 		return
 	}
